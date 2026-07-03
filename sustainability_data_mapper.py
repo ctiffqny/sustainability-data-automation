@@ -1,13 +1,76 @@
 import openpyxl
 import re
 from datetime import datetime
+from openpyxl.utils.cell import coordinate_from_string, column_index_from_string
+import operator
+from openpyxl.styles import PatternFill
 
 SOURCE_FILE = "testing_electricity_202604.xlsx"
 TARGET_FILE = "testing_sustainability_data_report.xlsx"
-OUTPUT_FILE = "testing_sustainability_data_report_updated.xlsx"
+TARGET_OUTPUT_FILE = "testing_sustainability_data_report_updated.xlsx"
+SOURCE_OUTPUT_FILE = "testing_electricity_202604_highlighted.xlsx"
 
 SOURCE_SHEET = "Breakdown"
 TARGET_SHEET = "Monthly Electricity (Overview)"
+
+DISCREPANCY_FILL = PatternFill(
+    fill_type = "solid",
+    start_color="FFFF00",
+    end_color="FFFF00"
+)
+
+# system calculates 
+OPERATORS = {
+    "+": operator.add,
+    "-": operator.sub,
+    "*": operator.mul,
+    "/": operator.truediv,
+}
+
+
+def resolve_cell_value(ws, value):
+    if isinstance(value, str) and value.startswith("="):
+        return calculate_simple_formula(ws, value)
+
+    return value
+
+
+def calculate_simple_formula(ws, formula):
+    original_formula = formula
+
+    formula = formula.strip().lstrip("=")
+
+    # handles number related formulas in excel
+    if re.fullmatch(r"\s*-?\d+(?:\.\d+)?(?:\s*[+\-*/]\s*-?\d+(?:\.\d+)?)+\s*", formula):
+        try:
+            return eval(formula, {"__builtins__": {}})
+        except Exception:
+            return original_formula
+
+    # handles position related formulas in excel e.g. =Y146-Z146
+    match = re.fullmatch(r"\s*([A-Z]+\d+)\s*([+\-*/])\s*([A-Z]+\d+)\s*", formula)
+    if match:
+        left_cell, op, right_cell = match.groups()
+
+        left_value = resolve_cell_value(ws, ws[left_cell].value)
+        right_value = resolve_cell_value(ws, ws[right_cell].value)
+
+        try:
+            left_value = float(left_value)
+            right_value = float(right_value)
+
+            if op == "+":
+                return left_value + right_value
+            if op == "-":
+                return left_value - right_value
+            if op == "*":
+                return left_value * right_value
+            if op == "/":
+                return left_value / right_value
+        except Exception:
+            return original_formula
+
+    return original_formula
 
 # lookback month: compare / transfer data within 12 months
 
@@ -134,6 +197,42 @@ def values_different(a, b):
         return abs(float(a) - float(b)) > 0.01
     except (ValueError, TypeError):
         return str(a).strip() != str(b).strip()
+    
+def numeric_difference(a, b):
+    try:
+        return abs(float(a) - float(b))
+    except (ValueError, TypeError):
+        return None
+
+# highlight inconsistency in target
+
+def flag_inconsistency(
+    target_ws,
+    source_ws_highlight,
+    target_row,
+    target_col,
+    source_row,
+    source_col,
+    inconsistencies,
+    period_value,
+    column_name,
+    existing_value,
+    new_value
+):
+    target_cell = target_ws.cell(row=target_row, column=target_col)
+    source_cell = source_ws_highlight.cell(row=source_row, column=source_col)
+
+    target_cell.fill = DISCREPANCY_FILL
+    source_cell.fill = DISCREPANCY_FILL
+
+    inconsistencies.append({
+        "period": normalize_period(period_value),
+        "column": column_name,
+        "existing_target_value": existing_value,
+        "new_source_value": new_value,
+        "target_cell": target_cell.coordinate,
+        "source_cell": source_cell.coordinate
+    })
 
 # new buildings may be added to Excel. automatically update new column to target
 def add_new_source_columns_to_target(
@@ -203,12 +302,21 @@ COLUMN_MAP = {
     "Staff Quarters": "Staff Quarters",
     "TKO JC Hall": "TKO JC Hall",
     "EC 3/F Data Centre (Elect)": "EC 3/F Data Centre (Elect)",
-    "EC 3/F Data Centre (Chiller kWhe)": "EC 3/F Data Centre (Chiller kWhe)"
+    "EC 3/F Data Centre (Chiller kWhe)": "EC 3/F Data Centre (Chiller kWhe)",
     "SRD (Chiller kWhe)": "SRD (Chiller kWhe)",
     "IB (Chiller kWhe)": "IB (Chiller kWhe)",
     "BMW EV Charger kWh (LG7 & WWT)": "BMW EV Charger kWh (LG7 & WWT)",
     "Corner Stone EV Charger kWh": "Corner Stone EV Charger kWh"
 }
+
+def to_number(value):
+    if value in ("", None):
+        return 0
+
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return 0
 
 def transfer_recent_months(lookback_months):
     skipped_columns = set()
@@ -224,9 +332,11 @@ def transfer_recent_months(lookback_months):
     )
 
     source_wb = openpyxl.load_workbook(SOURCE_FILE, data_only=True)
+    source_wb_highlight = openpyxl.load_workbook(SOURCE_FILE, data_only=True)
     target_wb = openpyxl.load_workbook(TARGET_FILE)
 
     source_ws = source_wb[SOURCE_SHEET]
+    source_ws_highlight = source_wb_highlight[SOURCE_SHEET]
     target_ws = target_wb[TARGET_SHEET]
 
     source_header_row = find_first_header_row(source_ws, "Period")
@@ -287,10 +397,10 @@ def transfer_recent_months(lookback_months):
                 skipped_columns.add(target_col)
                 continue
 
-            existing_target_value = target_ws.cell(
-                row=target_row,
-                column=target_col_num
-            ).value
+            existing_target_value = resolve_cell_value(
+                target_ws,
+                target_ws.cell(row=target_row, column=target_col_num).value
+            )
 
             if (
                 target_col not in new_columns
@@ -298,90 +408,131 @@ def transfer_recent_months(lookback_months):
                 and source_value not in ("", None)
                 and values_different(existing_target_value, source_value)
             ):
-                inconsistencies.append({
-                    "period": normalize_period(period_value),
-                    "column": target_col,
-                    "existing_target_value": existing_target_value,
-                    "new_source_value": source_value
-                })
-                continue
+                diff = numeric_difference(existing_target_value, source_value)
+
+                # automatically update if the numeric difference is less than 1
+                if diff is None or diff >= 1:
+                    flag_inconsistency(
+                    target_ws,
+                    source_ws_highlight,
+                    target_row,
+                    target_col_num,
+                    source_row,
+                    source_headers.get(normalize(source_col)),
+                    inconsistencies,
+                    period_value,
+                    target_col,
+                    existing_target_value,
+                    source_value
+                )
+                    continue
 
             target_ws.cell(row=target_row, column=target_col_num).value = source_value
 
-        main_chiller = get_value(
+        # combined chiller calculation
+        main_chiller = to_number(get_value(
             source_ws,
             source_row,
             source_headers,
             "Main Chiller Plant",
             skipped_columns
-        ) or 0
+        ))
 
-        lsk_chiller = get_value(
+        lsk_chiller = to_number(get_value(
             source_ws,
             source_row,
             source_headers,
             "LSK Chiller Plant",
             skipped_columns
-        ) or 0
+        ))
 
         combined_value = main_chiller + lsk_chiller
 
         combined_col = target_headers.get(normalize("Combined Chiller Plants"))
 
         if combined_col:
-            existing_combined = target_ws.cell(
-                row=target_row,
-                column=combined_col
-            ).value
+            existing_combined = resolve_cell_value(
+                target_ws,
+                target_ws.cell(row=target_row, column=combined_col).value
+            )
+
+            should_write_combined = True
 
             if (
                 existing_combined not in ("", None)
                 and values_different(existing_combined, combined_value)
             ):
-                inconsistencies.append({
-                    "period": normalize_period(period_value),
-                    "column": "Combined Chiller Plants",
-                    "existing_target_value": existing_combined,
-                    "new_source_value": combined_value
-                })
+                diff = numeric_difference(existing_combined, combined_value)
+
+                if diff is None or diff >= 1:
+                    flag_inconsistency(
+                        target_ws,
+                        source_ws_highlight,
+                        target_row,
+                        combined_col,
+                        source_row,
+                        source_headers.get(normalize("Main Chiller Plant")),
+                        inconsistencies,
+                        period_value,
+                        "Combined Chiller Plants",
+                        existing_combined,
+                        combined_value
+                    )
+                    should_write_combined = False
+
+            if should_write_combined:
+                target_ws.cell(row=target_row, column=combined_col).value = combined_value
 
         else:
-            target_ws.cell(row=target_row, column=combined_col).value = combined_value
             skipped_columns.add("Combined Chiller Plants")
 
-    target_wb.save(OUTPUT_FILE)
+    target_wb.save(TARGET_OUTPUT_FILE)
+    source_wb_highlight.save(SOURCE_OUTPUT_FILE)
 
-    print(f"\nDone. Saved as {OUTPUT_FILE}")
+    print(f"\Success. Saved as {TARGET_OUTPUT_FILE}")
+    print(f"Highlighted source copy saved as {SOURCE_OUTPUT_FILE}")
+    print()
 
     if new_columns:
         print("\nNew source columns detected and added to target:")
-    for col in new_columns:
-        print(f"- {col}")
-
-    print(
-        "Previous months were filled with 0, and available source data "
-        "has already been updated in the target workbook."
-    )
+        for col in new_columns:
+            print(f"- {col}")
+            print(
+            "Previous months were filled with 0, and available source data "
+            "has already been updated in the target workbook."
+            )
 
     if skipped_columns:
-        print("\nSkipped columns because they were missing in source or target:")
+        print("\nMissing columns (possibly due to naming error):")
         for col in sorted(skipped_columns):
             print(f"- {col}")
     else:
         print("\nNo columns were skipped.")
 
     if inconsistencies:
+        print("\n=============")
         print("\nNOTE:")
         print("Cells with inconsistencies were NOT overwritten.")
-        print("The existing values in the target workbook were preserved.\n")
+        print("The existing values in the target workbook were preserved.")
 
         print("\nInconsistencies found:")
+
+        print("\nSUST office reference - output workbook cell numbers:")
         for item in inconsistencies:
             print(
-                f"- {item['period']} | {item['column']}: "
-                f"target had {item['existing_target_value']}, "
+                f"- {item['period']} | {item['column']} ({item['target_cell']}): "
+                f"SUST had {item['existing_target_value']}, "
                 f"source has {item['new_source_value']}"
             )
+
+        print("\nOther department reference - source workbook cell numbers:")
+        for item in inconsistencies:
+            print(
+                f"- {item['period']} | {item['column']} ({item['source_cell']}): "
+                f"SUST had {item['existing_target_value']}, "
+                f"source has {item['new_source_value']}"
+            )
+
     else:
         print("\nNo inconsistencies found.")
 
