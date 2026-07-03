@@ -217,13 +217,21 @@ def flag_inconsistency(
     period_value,
     column_name,
     existing_value,
-    new_value
+    new_value,
+    second_source_col=None
 ):
     target_cell = target_ws.cell(row=target_row, column=target_col)
     source_cell = source_ws_highlight.cell(row=source_row, column=source_col)
 
     target_cell.fill = DISCREPANCY_FILL
     source_cell.fill = DISCREPANCY_FILL
+
+    source_cells = [source_cell.coordinate]
+
+    if second_source_col is not None:
+        second_source_cell = source_ws_highlight.cell(row=source_row, column=second_source_col)
+        second_source_cell.fill = DISCREPANCY_FILL
+        source_cells.append(second_source_cell.coordinate)
 
     inconsistencies.append({
         "period": normalize_period(period_value),
@@ -300,6 +308,7 @@ COLUMN_MAP = {
     "Staff Quarters & Commercial Outlets": "Staff Quarters & Commercial Outlets",
     "Commercial Outlets": "Commercial Outlets",
     "Staff Quarters": "Staff Quarters",
+    "Combined Chiller Plants": "Combined Chiller Plants",
     "TKO JC Hall": "TKO JC Hall",
     "EC 3/F Data Centre (Elect)": "EC 3/F Data Centre (Elect)",
     "EC 3/F Data Centre (Chiller kWhe)": "EC 3/F Data Centre (Chiller kWhe)",
@@ -325,11 +334,6 @@ def transfer_recent_months(lookback_months):
     today = datetime.today()
     end_date = first_day_of_month(today)
     start_date = subtract_months(end_date, lookback_months)
-
-    print(
-        f"Checking data from {start_date.strftime('%b-%y')} "
-        f"to {end_date.strftime('%b-%y')}"
-    )
 
     source_wb = openpyxl.load_workbook(SOURCE_FILE, data_only=True)
     source_wb_highlight = openpyxl.load_workbook(SOURCE_FILE, data_only=True)
@@ -429,69 +433,18 @@ def transfer_recent_months(lookback_months):
 
             target_ws.cell(row=target_row, column=target_col_num).value = source_value
 
-        # combined chiller calculation
-        main_chiller = to_number(get_value(
-            source_ws,
-            source_row,
-            source_headers,
-            "Main Chiller Plant",
-            skipped_columns
-        ))
-
-        lsk_chiller = to_number(get_value(
-            source_ws,
-            source_row,
-            source_headers,
-            "LSK Chiller Plant",
-            skipped_columns
-        ))
-
-        combined_value = main_chiller + lsk_chiller
-
-        combined_col = target_headers.get(normalize("Combined Chiller Plants"))
-
-        if combined_col:
-            existing_combined = resolve_cell_value(
-                target_ws,
-                target_ws.cell(row=target_row, column=combined_col).value
-            )
-
-            should_write_combined = True
-
-            if (
-                existing_combined not in ("", None)
-                and values_different(existing_combined, combined_value)
-            ):
-                diff = numeric_difference(existing_combined, combined_value)
-
-                if diff is None or diff >= 1:
-                    flag_inconsistency(
-                        target_ws,
-                        source_ws_highlight,
-                        target_row,
-                        combined_col,
-                        source_row,
-                        source_headers.get(normalize("Main Chiller Plant")),
-                        inconsistencies,
-                        period_value,
-                        "Combined Chiller Plants",
-                        existing_combined,
-                        combined_value
-                    )
-                    should_write_combined = False
-
-            if should_write_combined:
-                target_ws.cell(row=target_row, column=combined_col).value = combined_value
-
-        else:
-            skipped_columns.add("Combined Chiller Plants")
-
     target_wb.save(TARGET_OUTPUT_FILE)
     source_wb_highlight.save(SOURCE_OUTPUT_FILE)
 
-    print(f"\Success. Saved as {TARGET_OUTPUT_FILE}")
+    print(f"\nSuccess. Saved as {TARGET_OUTPUT_FILE}")
     print(f"Highlighted source copy saved as {SOURCE_OUTPUT_FILE}")
-    print()
+
+    print("\nComparison scope:")
+    print(
+        f"This application compared and transferred data only within the "
+        f"last {lookback_months} months "
+        f"({start_date.strftime('%b %y')} to {end_date.strftime('%b %y')})."
+    )
 
     if new_columns:
         print("\nNew source columns detected and added to target:")
