@@ -1,0 +1,48 @@
+category: electricity
+
+source_file: testing_electricity_202604.xlsx
+target_file: testing_sustainability_data_report.xlsx
+
+source_output_file: testing_electricity_202604_highlighted.xlsx
+target_output_file: testing_electricity_sustainability_data_report_updated.xlsx
+
+source_sheet: Breakdown
+target_sheet: Monthly Electricity (Overview)
+
+lookback_months: 12
+period_column: Period
+
+column_map:
+  CLP Total: CLP Total
+  Main Academic Buildings & Other Public Facilities: Main Academic Buildings & Other Public Facilities
+  EC: EC (ALL)
+  CYT: CYT
+  Shaw Auditorium: Shaw Auditorium
+  APCF (R/F Zone L): APCF (R/F Zone L)
+  New Data Centre (2/F Zone L): New Data Centre (2/F Zone L)
+  Main Chiller Plant: Main Chiller Plant
+  LSKBB: LSKBB
+  IAS: IAS
+  Conference Lodge: Conference Lodge
+  LSK Chiller Plant: LSK Chiller Plant
+  WWT: WWT
+  Water Sport Centre: Water Sport Centre
+  SISC: SISC
+  HPC5: HPC5
+  RB2: RB2
+  IB: IB
+  SRD (UG10-13): SRD (UG10-13)
+  TA-B: TA-B
+  GGT: GGT
+  Student Housing UG1-UG9, PG1-PG2: Student Housing UG1-UG9, PG1-PG2
+  Staff Quarters & Commercial Outlets: Staff Quarters & Commercial Outlets
+  Commercial Outlets: Commercial Outlets
+  Staff Quarters: Staff Quarters
+  TKO JC Hall: TKO JC Hall
+  EC 3/F Data Centre (Elect): EC 3/F Data Centre (Elect)
+  EC 3/F Data Centre (Chiller kWhe): EC 3/F Data Centre (Chiller kWhe)
+  SRD (Chiller kWhe): SRD (Chiller kWhe)
+  IB (Chiller kWhe): IB (Chiller kWhe)
+  BMW EV Charger kWh (LG7 & WWT): BMW EV Charger kWh (LG7 & WWT)
+  Corner Stone EV Charger kWh: Corner Stone EV Charger kWh
+  Combined Chiller Plants: Combined Chiller Plants

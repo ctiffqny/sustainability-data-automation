@@ -1,0 +1,38 @@
+category: recyclable_wastes
+
+source_file: testing_recyclable_wastes_statistics_may2026.xlsx
+target_file: testing_sustainability_data_report.xlsx
+
+source_output_file: testing_recyclable_wastes_statistics_may2026_highlighted.xlsx
+target_output_file: testing_recyclable_wastes_sustainability_data_report_updated.xlsx
+
+source_sheet: MAY-26
+target_sheet: Raw Data (KG)
+
+lookback_months: 12
+source_category_header: Recycled Types
+source_total_header: Total Weight
+target_period_column: Period
+
+column_map:
+  Trash: General Wastes
+  Yellow Skip: Yellow skip
+  Paper (corrugated containers+office paper+ newspapers):
+    - Old Corrugated Containers
+    - Office Paper / Newspapers
+  Metal (Aluminium): Aluminum Cans
+  Metal Skip (Metal): Metal
+  Plastic (waste plastic bottles + plastic bag):
+  - Waste Plastic Bottles
+  - Other:(Plastic bags)
+  Rechargeable Battery: Other:(Rechargeable Batteries )
+  Toner: Other:(Toner Catridge)
+
+
+
+
+
+
+
+
+

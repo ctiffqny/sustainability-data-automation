@@ -1,3 +1,7 @@
 # ignore Excel temporary lock files
 ~$*
 .~*
+
+# ignore pycache
+__pycache__/
+*.py[cod]

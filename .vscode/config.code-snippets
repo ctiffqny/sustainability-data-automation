@@ -1,0 +1,24 @@
+{
+  "YAML Configuration Template": {
+    "scope": "yaml",
+    "prefix": "yamlconfig",
+    "body": [
+      "category: \"\"",
+      "",
+      "source_file: \"\"",
+      "target_file: \"\"",
+      "",
+      "source_output_file: \"\"",
+      "target_output_file: \"\"",
+      "",
+      "source_sheet: \"\"",
+      "target_sheet: \"\"",
+      "",
+      "lookback_months: ${1:0}",
+      "period_column: \"\"",
+      "",
+      "column_map: {target: source}"
+    ],
+    "description": "Inserts the data mapping configuration template so I don't have to type again"
+  }
+}
