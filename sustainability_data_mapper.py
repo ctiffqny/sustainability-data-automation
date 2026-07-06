@@ -4,6 +4,7 @@ from datetime import datetime
 from openpyxl.utils.cell import coordinate_from_string, column_index_from_string
 import operator
 from openpyxl.styles import PatternFill
+from copy import copy
 
 SOURCE_FILE = "testing_electricity_202604.xlsx"
 TARGET_FILE = "testing_sustainability_data_report.xlsx"
@@ -19,7 +20,38 @@ DISCREPANCY_FILL = PatternFill(
     end_color="FFFF00"
 )
 
-# system calculates 
+def save_changed_sheet_only(target_wb, sheet_name, output_file):
+    source_ws = target_wb[sheet_name]
+
+    output_wb = openpyxl.Workbook()
+    output_ws = output_wb.active
+    output_ws.title = sheet_name
+
+    for row in source_ws.iter_rows():
+        for cell in row:
+            new_cell = output_ws[cell.coordinate]
+            new_cell.value = cell.value
+
+            if cell.has_style:
+                new_cell.font = copy(cell.font)
+                new_cell.fill = copy(cell.fill)
+                new_cell.border = copy(cell.border)
+                new_cell.alignment = copy(cell.alignment)
+                new_cell.number_format = cell.number_format
+                new_cell.protection = copy(cell.protection)
+
+    for col_letter, dimension in source_ws.column_dimensions.items():
+        output_ws.column_dimensions[col_letter].width = dimension.width
+
+    for row_num, dimension in source_ws.row_dimensions.items():
+        output_ws.row_dimensions[row_num].height = dimension.height
+
+    for merged_range in source_ws.merged_cells.ranges:
+        output_ws.merge_cells(str(merged_range))
+
+    output_wb.save(output_file)
+
+# system calculates excel formulas before comparing
 OPERATORS = {
     "+": operator.add,
     "-": operator.sub,
@@ -188,6 +220,7 @@ def find_period_row(ws, headers, period_value):
 
     return ws.max_row + 1   # add new row if period not found
 
+# compare differences in value
 
 def values_different(a, b):
     if a in ("", None) and b in ("", None):
@@ -242,6 +275,17 @@ def flag_inconsistency(
         "source_cell": source_cell.coordinate
     })
 
+# make sure new building is added after all previous buildings instead of end of sheet
+def find_last_building_column(headers):
+    last_col = 0
+
+    for target_col in COLUMN_MAP.keys():
+        col = headers.get(normalize(target_col))
+        if col and col > last_col:
+            last_col = col
+
+    return last_col
+
 # new buildings may be added to Excel. automatically update new column to target
 def add_new_source_columns_to_target(
     source_ws,
@@ -267,14 +311,28 @@ def add_new_source_columns_to_target(
             continue
 
         if normalized_source_name not in target_headers:
-            new_col_num = target_ws.max_column + 1
+            new_col_num = find_last_building_column(target_headers) + 1
+
+            target_ws.insert_cols(new_col_num)
             target_ws.cell(row=target_header_row, column=new_col_num).value = source_header_name
 
-            target_headers[normalized_source_name] = new_col_num
+            target_headers.clear()
+            target_headers.update(get_headers(target_ws, target_header_row))
+
             COLUMN_MAP[source_header_name] = source_header_name
             new_columns.append(source_header_name)
 
+            period_col = target_headers.get(normalize("Period"))
+
+            if not period_col:
+                raise ValueError("Could not find Period column after inserting new column")
+
             for row in range(target_header_row + 1, target_ws.max_row + 1):
+                period_value = target_ws.cell(row=row, column=period_col).value
+
+                if parse_period(period_value) is None:
+                    continue
+
                 if target_ws.cell(row=row, column=new_col_num).value in ("", None):
                     target_ws.cell(row=row, column=new_col_num).value = 0
 
@@ -430,10 +488,19 @@ def transfer_recent_months(lookback_months):
                     source_value
                 )
                     continue
+            
+            # make sure it doesn't override existing 0 with blank if new building
+            if source_value in ("", None):
+                pass
+            else:
+                target_ws.cell(row=target_row, column=target_col_num).value = source_value
 
-            target_ws.cell(row=target_row, column=target_col_num).value = source_value
-
-    target_wb.save(TARGET_OUTPUT_FILE)
+    save_changed_sheet_only(
+        target_wb,
+        TARGET_SHEET,
+        TARGET_OUTPUT_FILE
+    )
+    
     source_wb_highlight.save(SOURCE_OUTPUT_FILE)
 
     print(f"\nSuccess. Saved as {TARGET_OUTPUT_FILE}")

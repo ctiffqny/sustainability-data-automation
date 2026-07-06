@@ -1,0 +1,3 @@
+# ignore Excel temporary lock files
+~$*
+.~*
