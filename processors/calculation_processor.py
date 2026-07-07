@@ -1,0 +1,1 @@
+# stuff like totals, average, percentages, rolling sums

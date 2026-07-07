@@ -26,7 +26,7 @@ def run_excel_transfer(config):
                 new_cell = output_ws[cell.coordinate]
                 new_cell.value = cell.value
 
-                if cell.has_style:
+                if cell.has_style and cell.value not in ("", None):
                     new_cell.font = copy(cell.font)
                     new_cell.fill = copy(cell.fill)
                     new_cell.border = copy(cell.border)
@@ -638,7 +638,8 @@ def run_excel_transfer(config):
                     config["source_total_header"]
                 )
             
-            source_value = convert_to_kg(source_categories, source_value)
+            if not isinstance(source_categories, list):
+                source_value = convert_to_kg(source_categories, source_value)
 
             target_col_num = target_headers.get(normalize(target_col))
 
@@ -646,7 +647,17 @@ def run_excel_transfer(config):
                 skipped_columns.append(target_col)
                 continue
 
-            target_ws.cell(row=target_row, column=target_col_num).value = source_value
+            target_cell = target_ws.cell(row=target_row, column=target_col_num)
+
+            # preserve any existing formula in the target cell, for any category
+            if isinstance(target_cell.value, str) and target_cell.value.startswith("="):
+                continue
+
+            # do not overwrite with blank source values
+            if source_value in ("", None):
+                continue
+
+            target_cell.value = source_value
 
         save_changed_sheet_only(
             target_wb,
@@ -663,7 +674,7 @@ def run_excel_transfer(config):
     
     category = config["category"].lower()
 
-    if category in ("recyclable_wastes"):
+    if category == "recyclable_wastes":
         transfer_recyclable_wastes(config)
     else:
         transfer_recent_months(config)
