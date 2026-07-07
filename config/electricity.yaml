@@ -1,7 +1,7 @@
 category: electricity
 
-source_file: testing_electricity_202604.xlsx
-target_file: testing_sustainability_data_report.xlsx
+source_file: ref/testing_electricity_202604.xlsx
+target_file: ref/testing_sustainability_data_report.xlsx
 
 source_output_file: testing_electricity_202604_highlighted.xlsx
 target_output_file: testing_electricity_sustainability_data_report_updated.xlsx

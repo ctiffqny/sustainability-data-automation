@@ -14,37 +14,6 @@ def run_excel_transfer(config):
         end_color="FFFF00"
     )
 
-    def save_changed_sheet_only(target_wb, sheet_name, output_file):
-        source_ws = target_wb[sheet_name]
-
-        output_wb = openpyxl.Workbook()
-        output_ws = output_wb.active
-        output_ws.title = sheet_name
-
-        for row in source_ws.iter_rows():
-            for cell in row:
-                new_cell = output_ws[cell.coordinate]
-                new_cell.value = cell.value
-
-                if cell.has_style and cell.value not in ("", None):
-                    new_cell.font = copy(cell.font)
-                    new_cell.fill = copy(cell.fill)
-                    new_cell.border = copy(cell.border)
-                    new_cell.alignment = copy(cell.alignment)
-                    new_cell.number_format = cell.number_format
-                    new_cell.protection = copy(cell.protection)
-
-        for col_letter, dimension in source_ws.column_dimensions.items():
-            output_ws.column_dimensions[col_letter].width = dimension.width
-
-        for row_num, dimension in source_ws.row_dimensions.items():
-            output_ws.row_dimensions[row_num].height = dimension.height
-
-        for merged_range in source_ws.merged_cells.ranges:
-            output_ws.merge_cells(str(merged_range))
-
-        output_wb.save(output_file)
-
     # system calculates excel formulas before comparing
     OPERATORS = {
         "+": operator.add,
@@ -404,6 +373,21 @@ def run_excel_transfer(config):
         ).value
 
         return to_number(value)
+    
+    def keep_only_relevant_sheets(wb, target_sheet):
+        ws = wb[target_sheet]
+        sheets_to_keep = {target_sheet}
+
+        for row in ws.iter_rows():
+            for cell in row:
+                if isinstance(cell.value, str) and cell.value.startswith("="):
+                    for sheet_name in wb.sheetnames:
+                        if f"'{sheet_name}'!" in cell.value or f"{sheet_name}!" in cell.value:
+                            sheets_to_keep.add(sheet_name)
+
+        for sheet_name in list(wb.sheetnames):
+            if sheet_name not in sheets_to_keep:
+                del wb[sheet_name]
 
 
     def transfer_recent_months(config):
@@ -530,11 +514,8 @@ def run_excel_transfer(config):
                 else:
                     target_ws.cell(row=target_row, column=target_col_num).value = source_value
 
-        save_changed_sheet_only(
-            target_wb,
-            config["target_sheet"],
-            config["target_output_file"]
-        )
+        keep_only_relevant_sheets(target_wb, config["target_sheet"])
+        target_wb.save(config["target_output_file"])
         
         source_wb_highlight.save(config["source_output_file"])
 
@@ -659,11 +640,8 @@ def run_excel_transfer(config):
 
             target_cell.value = source_value
 
-        save_changed_sheet_only(
-            target_wb,
-            config["target_sheet"],
-            config["target_output_file"]
-        )
+        keep_only_relevant_sheets(target_wb, config["target_sheet"])
+        target_wb.save(config["target_output_file"])
 
         print(f"\nSuccess. Saved as {config['target_output_file']}")
 
