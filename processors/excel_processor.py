@@ -104,6 +104,10 @@ def run_excel_transfer(config):
         except (ValueError, TypeError):
             return 0
         
+    def round_to_reporting(value):
+        value = to_number(value)
+        return round(value, -1)
+        
     def convert_to_kg(category_name, value):
 
         if value in ("", None):
@@ -376,75 +380,106 @@ def run_excel_transfer(config):
     
     # INCONSISTENCY TESTING FOR WASTE
 
+    def get_recent_source_sheets(source_wb, current_sheet_name, lookback_count=12):
+        sheet_names = source_wb.sheetnames
+
+        if current_sheet_name not in sheet_names:
+            raise ValueError(f"Could not find source sheet: {current_sheet_name}")
+
+        current_index = sheet_names.index(current_sheet_name)
+
+        start_index = max(0, current_index - lookback_count + 1)
+
+        return sheet_names[start_index: current_index + 1]
+
     def check_recyclable_waste_inconsistencies(config):
         print(">>> Running waste inconsistency check")
+
         inconsistencies = []
 
         source_wb = openpyxl.load_workbook(config["source_file"], data_only=True)
         target_wb = openpyxl.load_workbook(config["target_file"], data_only=True)
 
-        source_ws = source_wb[config["source_sheet"]]
         target_ws = target_wb[config["target_sheet"]]
 
         target_header_row = 1
         target_headers = get_headers(target_ws, target_header_row)
 
-        period_value = config["source_sheet"]
-        target_row = find_month_row(target_ws, period_value)
+        source_sheet_names = get_recent_source_sheets(
+            source_wb,
+            config["source_sheet"],
+            config.get("lookback_months", 12)
+        )
 
-        for target_col, source_categories in config["column_map"].items():
+        print(
+            f"\nThis application checked recyclable waste data within the "
+            f"last {len(source_sheet_names)} months "
+            f"({source_sheet_names[0]} to {source_sheet_names[-1]})."
+        )
 
-            if isinstance(source_categories, list):
-                source_parts = []
+        for source_sheet_name in source_sheet_names:
+            source_ws = source_wb[source_sheet_name]
 
-                for source_category in source_categories:
+            period_value = source_sheet_name
+            target_row = find_month_row(target_ws, period_value)
+
+            for target_col, source_categories in config["column_map"].items():
+
+                if isinstance(source_categories, list):
+                    source_parts = []
+
+                    for source_category in source_categories:
+                        raw_value = extract_total_by_category(
+                            source_ws,
+                            source_category,
+                            config["source_total_header"]
+                        )
+
+                        converted_value = convert_to_kg(source_category, raw_value)
+
+                        source_parts.append({
+                            "name": source_category,
+                            "value": converted_value
+                        })
+
+                    source_value = sum(part["value"] for part in source_parts)
+
+                    source_label = " + ".join(
+                        f"{part['name']} ({part['value']:,.0f})"
+                        for part in source_parts
+                    )
+
+                else:
                     raw_value = extract_total_by_category(
                         source_ws,
-                        source_category,
+                        source_categories,
                         config["source_total_header"]
                     )
 
-                    converted_value = convert_to_kg(source_category, raw_value)
+                    source_value = convert_to_kg(source_categories, raw_value)
 
-                    source_parts.append({
-                        "name": source_category,
-                        "value": converted_value
+                    source_label = f"{source_categories} ({source_value:,.0f})"
+
+                target_col_num = target_headers.get(normalize(target_col))
+
+                if not target_col_num:
+                    print(f"Missing target column: {target_col}")
+                    continue
+
+                target_value = target_ws.cell(row=target_row, column=target_col_num).value
+
+                target_reported = round_to_reporting(target_value)
+                source_reported = round_to_reporting(source_value)
+
+                if target_reported != source_reported:
+                    inconsistencies.append({
+                        "period": normalize_period(period_value),
+                        "target_column": target_col,
+                        "source_categories": source_label,
+                        "target_value": target_reported,
+                        "source_value": source_reported,
+                        "difference": source_reported - target_reported
                     })
-
-                source_value = sum(part["value"] for part in source_parts)
-                source_label = " + ".join(
-                    f"{part['name']} ({part['value']:,.0f})"
-                    for part in source_parts
-                )
-
-            else:
-                raw_value = extract_total_by_category(
-                    source_ws,
-                    source_categories,
-                    config["source_total_header"]
-                )
-
-                source_value = convert_to_kg(source_categories, raw_value)
-                source_label = f"{source_categories} ({source_value:,.0f})"
-
-            target_col_num = target_headers.get(normalize(target_col))
-
-            if not target_col_num:
-                print(f"Missing target column: {target_col}")
-                continue
-
-            target_value = target_ws.cell(row=target_row, column=target_col_num).value
-            target_value = to_number(target_value)
-
-            if values_different(target_value, source_value):
-                inconsistencies.append({
-                    "period": normalize_period(period_value),
-                    "target_column": target_col,
-                    "source_categories": source_label,
-                    "target_value": target_value,
-                    "source_value": source_value,
-                    "difference": source_value - target_value
-                })
 
         if inconsistencies:
             print("\n=============")
@@ -457,7 +492,7 @@ def run_excel_transfer(config):
                     f"target has {item['target_value']:,.0f}, "
                     f"source has {item['source_value']:,.0f} "
                     f"[{item['source_categories']}], "
-                    f"difference {item['difference']:,.0f}"
+                    f"difference {item['difference']:,.2f}"
                 )
         else:
             print("\nNo waste inconsistencies found.")
