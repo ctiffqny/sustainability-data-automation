@@ -374,6 +374,94 @@ def run_excel_transfer(config):
 
         return to_number(value)
     
+    # INCONSISTENCY TESTING FOR WASTE
+
+    def check_recyclable_waste_inconsistencies(config):
+        print(">>> Running waste inconsistency check")
+        inconsistencies = []
+
+        source_wb = openpyxl.load_workbook(config["source_file"], data_only=True)
+        target_wb = openpyxl.load_workbook(config["target_file"], data_only=True)
+
+        source_ws = source_wb[config["source_sheet"]]
+        target_ws = target_wb[config["target_sheet"]]
+
+        target_header_row = 1
+        target_headers = get_headers(target_ws, target_header_row)
+
+        period_value = config["source_sheet"]
+        target_row = find_month_row(target_ws, period_value)
+
+        for target_col, source_categories in config["column_map"].items():
+
+            if isinstance(source_categories, list):
+                source_parts = []
+
+                for source_category in source_categories:
+                    raw_value = extract_total_by_category(
+                        source_ws,
+                        source_category,
+                        config["source_total_header"]
+                    )
+
+                    converted_value = convert_to_kg(source_category, raw_value)
+
+                    source_parts.append({
+                        "name": source_category,
+                        "value": converted_value
+                    })
+
+                source_value = sum(part["value"] for part in source_parts)
+                source_label = " + ".join(
+                    f"{part['name']} ({part['value']:,.0f})"
+                    for part in source_parts
+                )
+
+            else:
+                raw_value = extract_total_by_category(
+                    source_ws,
+                    source_categories,
+                    config["source_total_header"]
+                )
+
+                source_value = convert_to_kg(source_categories, raw_value)
+                source_label = f"{source_categories} ({source_value:,.0f})"
+
+            target_col_num = target_headers.get(normalize(target_col))
+
+            if not target_col_num:
+                print(f"Missing target column: {target_col}")
+                continue
+
+            target_value = target_ws.cell(row=target_row, column=target_col_num).value
+            target_value = to_number(target_value)
+
+            if values_different(target_value, source_value):
+                inconsistencies.append({
+                    "period": normalize_period(period_value),
+                    "target_column": target_col,
+                    "source_categories": source_label,
+                    "target_value": target_value,
+                    "source_value": source_value,
+                    "difference": source_value - target_value
+                })
+
+        if inconsistencies:
+            print("\n=============")
+            print("WASTE INCONSISTENCIES FOUND")
+            print("No cells were updated. This is a check-only run.")
+
+            for item in inconsistencies:
+                print(
+                    f"- {item['period']} | {item['target_column']}: "
+                    f"target has {item['target_value']:,.0f}, "
+                    f"source has {item['source_value']:,.0f} "
+                    f"[{item['source_categories']}], "
+                    f"difference {item['difference']:,.0f}"
+                )
+        else:
+            print("\nNo waste inconsistencies found.")
+    
     def keep_only_relevant_sheets(wb, target_sheet):
         ws = wb[target_sheet]
         sheets_to_keep = {target_sheet}
@@ -651,8 +739,9 @@ def run_excel_transfer(config):
                 print(f"- {col}")
     
     category = config["category"].lower()
+    print(f">>> category is: {repr(category)}")
 
     if category == "recyclable_wastes":
-        transfer_recyclable_wastes(config)
+        check_recyclable_waste_inconsistencies(config)
     else:
         transfer_recent_months(config)
