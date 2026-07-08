@@ -28,3 +28,87 @@ column_map:
   Rechargeable Battery: Other:(Rechargeable Batteries )
   Toner: Other:(Toner Catridge)
 
+raw_food_data:
+  source_sheet: "Raw Food Data (KG)"
+  source_month_column: "Date"
+  source_value_column: "Total (kg)"
+
+  target_sheet: "Raw Data (KG)"
+  target_month_column_index: 1
+  target_value_column: "Food Waste (Contractor)"
+
+# ======================
+
+calculation_source_sheet: "Raw Data (KG)"
+calculation_target_sheet: "Processed Waste (KG)"
+
+calculation_months:
+  # mode: selected
+  # months:
+  #  - "Jul-25"
+  # mode: missing_only
+  mode: range
+  start: "Jul-25"
+  end: "May-26"
+
+calculations:
+  monthly_total_waste_to_landfill:
+    output_column: "Monthly Total of Waste to Landfill"
+    type: "sum"
+    source_items:
+      - "Trash"
+      - "Yellow Skip"
+
+  monthly_total_recycling:
+    output_column: "Monthly Total of Recycling"
+    type: "sum"
+    source_items:
+      - "Paper (LG7/SSID)"
+      - "Paper (corrugated containers+office paper+ newspapers)"
+      - "Metal (Aluminium)"
+      - "Metal Skip (Metal)"
+      - "Plastic (waste plastic bottles + plastic bag)"
+      - "Expanded Polystyrene"
+      - "Glass"
+      - "Clothes"
+      - "Fluorescent Tube @ 0.3kg"
+      - "Lamp @ 0.07kg"
+      - "Rechargeable Battery"
+      - "Toner"
+      - "Electrical Appliance"
+      - "Wood"
+      - "Food Waste (Contractor)"
+      - "Animal Bedding"
+      - "Landscape"
+      - "Tetra Packs"
+
+  waste_to_landfill_12_month_rolling_sum:
+    output_column: "Waste to Landfill 12 month rolling sum"
+    type: "rolling_sum"
+    input_column: "Monthly Total of Waste to Landfill"
+    lookback_months: 12
+
+  waste_to_landfill_12_month_rolling_average:
+    output_column: "Waste to Landfill 12 month rolling average"
+    type: "rolling_average"
+    input_column: "Monthly Total of Waste to Landfill"
+    lookback_months: 12
+
+  recycling_12_month_rolling_sum:
+    output_column: "Recycling 12 month rolling sum"
+    type: "rolling_sum"
+    input_column: "Monthly Total of Recycling"
+    lookback_months: 12
+
+  recycling_12_month_rolling_average:
+    output_column: "Recycling 12 month rolling average"
+    type: "rolling_average"
+    input_column: "Monthly Total of Recycling"
+    lookback_months: 12
+
+  total_waste_generated:
+    output_column: "Yearly Total Waste Generated"
+    type: "sum"
+    input_columns:
+      - "Monthly Total of Waste to Landfill"
+      - "Monthly Total of Recycling"

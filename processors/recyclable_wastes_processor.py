@@ -4,15 +4,18 @@ from core.period_utils import normalize, normalize_period
 from core.excel_utils import (
     get_headers,
     set_value,
+    find_period_row,
     find_month_row,
     find_cell_by_text,
-    keep_only_relevant_sheets,
+    find_first_header_row,
+    keep_only_named_sheets,
 )
 
 from processors.calculation_processor import (
     to_number,
     round_to_reporting,
     convert_to_kg,
+    data_processing
 )
 
 
@@ -32,6 +35,44 @@ def extract_total_by_category(ws, category_name, total_header):
     ).value
 
     return to_number(value)
+
+
+def transfer_raw_food_data(target_wb, config):
+    settings = config["raw_food_data"]
+
+    source_ws = target_wb[settings["source_sheet"]]
+    target_ws = target_wb[settings["target_sheet"]]
+
+    source_header_row = find_first_header_row(
+        source_ws,
+        settings["source_month_column"]
+    )
+    target_header_row = 1
+
+    source_headers = get_headers(source_ws, source_header_row)
+    target_headers = get_headers(target_ws, target_header_row)
+
+    source_month_col = source_headers[normalize(settings["source_month_column"])]
+    source_value_col = source_headers[normalize(settings["source_value_column"])]
+
+    target_value_col = target_headers[normalize(settings["target_value_column"])]
+
+
+    for source_row in range(source_header_row + 1, source_ws.max_row + 1):
+
+        month = source_ws.cell(row=source_row, column=source_month_col).value
+
+        target_row = find_month_row(target_ws, month)
+
+        value = source_ws.cell(
+            row=source_row,
+            column=source_value_col
+        ).value
+
+        target_ws.cell(
+            row=target_row,
+            column=target_value_col
+        ).value = value
 
 
 # INCONSISTENCY TESTING FOR WASTE
@@ -54,7 +95,7 @@ def transfer_recyclable_wastes(config):
     inconsistencies = []
 
     source_wb = openpyxl.load_workbook(config["source_file"], data_only=True)
-    target_wb = openpyxl.load_workbook(config["target_file"])
+    target_wb = openpyxl.load_workbook(config["target_file"], data_only=True)
 
     source_ws = source_wb[config["source_sheet"]]
     target_ws = target_wb[config["target_sheet"]]
@@ -136,8 +177,15 @@ def transfer_recyclable_wastes(config):
 
         target_cell.value = source_value
 
-    keep_only_relevant_sheets(target_wb, config["target_sheet"])
-    target_wb.save(config["target_output_file"])
+    transfer_raw_food_data(target_wb, config)
+
+    keep_only_named_sheets(
+        target_wb,
+        [
+            config["target_sheet"],
+            config["calculation_target_sheet"],
+        ]
+    )
 
     print(f"\nSuccess. Saved as {config['target_output_file']}")
     print("Inconsistencies were reported only. Cell highlighting is currently disabled.")
@@ -168,6 +216,10 @@ def transfer_recyclable_wastes(config):
     else:
         print("\nNo inconsistencies found.")
 
+    return target_wb
+
 
 def process_recyclable_wastes(config):
-    transfer_recyclable_wastes(config)
+    target_wb = transfer_recyclable_wastes(config)
+    data_processing(target_wb, config)
+    target_wb.save(config["target_output_file"])

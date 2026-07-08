@@ -141,8 +141,19 @@ def keep_only_relevant_sheets(wb, target_sheet):
         for cell in row:
             if isinstance(cell.value, str) and cell.value.startswith("="):
                 for sheet_name in wb.sheetnames:
-                    if f"'{sheet_name}'!" in cell.value or f"{sheet_name}!" in cell.value:
+                    if (
+                        f"'{sheet_name}'!" in cell.value
+                        or f"{sheet_name}!" in cell.value
+                    ):
                         sheets_to_keep.add(sheet_name)
+
+    for sheet_name in list(wb.sheetnames):
+        if sheet_name not in sheets_to_keep:
+            del wb[sheet_name]
+
+
+def keep_only_named_sheets(wb, sheet_names_to_keep):
+    sheets_to_keep = set(sheet_names_to_keep)
 
     for sheet_name in list(wb.sheetnames):
         if sheet_name not in sheets_to_keep:
