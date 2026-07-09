@@ -5,6 +5,22 @@
 # ignore pycache
 __pycache__/
 *.py[cod]
+*.pyc
+.venv/
 
 # macOS
 .DS_Store
+Thumbs.db
+
+# react
+frontend/node_modules/
+frontend/dist/
+
+# backend generated files
+backend/temp/
+backend/uploads/
+backend/outputs/
+backend/backups/
+
+# VS Code
+.vscode/
