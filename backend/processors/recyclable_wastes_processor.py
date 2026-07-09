@@ -1,7 +1,7 @@
 import openpyxl
 
-from core.period_utils import normalize, normalize_period
-from core.excel_utils import (
+from backend.core.period_utils import normalize, normalize_period
+from backend.core.excel_utils import (
     get_headers,
     set_value,
     find_period_row,
@@ -11,7 +11,7 @@ from core.excel_utils import (
     keep_only_named_sheets,
 )
 
-from processors.calculation_processor import (
+from backend.processors.calculation_processor import (
     to_number,
     round_to_reporting,
     convert_to_kg,

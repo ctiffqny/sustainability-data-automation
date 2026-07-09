@@ -1,5 +1,5 @@
-from processors.electricity_processor import process_electricity
-from processors.recyclable_wastes_processor import process_recyclable_wastes
+from backend.processors.electricity_processor import process_electricity
+from backend.processors.recyclable_wastes_processor import process_recyclable_wastes
 
 
 def run_excel_transfer(config):

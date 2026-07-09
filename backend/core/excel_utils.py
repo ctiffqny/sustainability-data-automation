@@ -1,6 +1,6 @@
 from openpyxl.styles import PatternFill
 
-from core.period_utils import (
+from backend.core.period_utils import (
     normalize,
     parse_period,
     normalize_period,

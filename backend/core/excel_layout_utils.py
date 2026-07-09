@@ -1,5 +1,5 @@
-from core.period_utils import normalize
-from core.excel_format_utils import copy_column_format_from_source
+from backend.core.period_utils import normalize
+from backend.core.excel_format_utils import copy_column_format_from_source
 
 def find_source_separator_after(source_ws, source_header_row, source_col):
     separator_col = source_col + 1

@@ -1,13 +1,13 @@
 import openpyxl
 
-from core.period_utils import (
+from backend.core.period_utils import (
     normalize,
     parse_period,
     first_day_of_month,
     subtract_months,
 )
 
-from core.excel_utils import (
+from backend.core.excel_utils import (
     find_first_header_row,
     get_headers,
     get_value,
@@ -16,28 +16,23 @@ from core.excel_utils import (
     keep_only_relevant_sheets,
 )
 
-from processors.calculation_processor import (
+from backend.processors.calculation_processor import (
     resolve_cell_value,
     values_different,
     numeric_difference,
 )
 
-from core.excel_format_utils import (
+from backend.core.excel_format_utils import (
     copy_cell_format,
     copy_column_format_from_source,
 )
 
-from core.excel_layout_utils import (
+from backend.core.excel_layout_utils import (
     find_previous_source_header_in_target,
-    ensure_source_separators_exist,
-    copy_source_separator_after_if_exists,
 )
 
 
 def format_new_period_row(target_ws, target_row, period_col, period_date):
-    """
-    Copies formatting from the previous row and forces Period format to May-26 style.
-    """
     template_row = target_row - 1
 
     if template_row >= 1:
@@ -98,7 +93,6 @@ def add_new_source_columns_to_output(
 
             new_col_num = previous_target_col + 1
 
-            # Copy any blank separator columns that exist in the source
             for source_gap_col in range(previous_source_col + 1, source_col_num):
                 source_gap_value = source_ws.cell(
                     row=source_header_row,
@@ -108,10 +102,7 @@ def add_new_source_columns_to_output(
                 if source_gap_value not in ("", None):
                     continue
 
-                if target_ws.cell(
-                    row=target_header_row,
-                    column=new_col_num,
-                ).value not in ("", None):
+                if target_ws.cell(row=target_header_row, column=new_col_num).value not in ("", None):
                     target_ws.insert_cols(new_col_num)
 
                 copy_column_format_from_source(
@@ -125,7 +116,6 @@ def add_new_source_columns_to_output(
 
                 new_col_num += 1
 
-            # Insert new building column
             target_ws.insert_cols(new_col_num)
 
             copy_column_format_from_source(
@@ -137,27 +127,17 @@ def add_new_source_columns_to_output(
                 target_header_row,
             )
 
-            target_ws.cell(
-                row=target_header_row,
-                column=new_col_num,
-            ).value = source_header_name
+            target_ws.cell(row=target_header_row, column=new_col_num).value = source_header_name
 
-            # Copy blank separator immediately after this source building, if source has one
             source_separator_col = source_col_num + 1
 
             if (
                 source_separator_col <= source_ws.max_column
-                and source_ws.cell(
-                    row=source_header_row,
-                    column=source_separator_col,
-                ).value in ("", None)
+                and source_ws.cell(row=source_header_row, column=source_separator_col).value in ("", None)
             ):
                 target_separator_col = new_col_num + 1
 
-                if target_ws.cell(
-                    row=target_header_row,
-                    column=target_separator_col,
-                ).value not in ("", None):
+                if target_ws.cell(row=target_header_row, column=target_separator_col).value not in ("", None):
                     target_ws.insert_cols(target_separator_col)
 
                 copy_column_format_from_source(
@@ -200,9 +180,67 @@ def add_new_source_columns_to_output(
     return new_columns
 
 
-def process_electricity(config):
+def build_messages(
+    config,
+    start_date,
+    end_date,
+    new_columns,
+    skipped_columns,
+    inconsistencies,
+    saved,
+):
+    messages = []
+
+    if saved:
+        messages.append(f"Success. Saved as {config['target_output_file']}")
+        messages.append(f"Highlighted source copy saved as {config['source_output_file']}")
+    else:
+        messages.append("Preview generated. No files were saved yet.")
+
+    messages.append(
+        f"This application compared and transferred data only within the "
+        f"last {config['lookback_months']} months "
+        f"({start_date.strftime('%b %y')} to {end_date.strftime('%b %y')})."
+    )
+
+    if new_columns:
+        messages.append("New source columns detected and added to output:")
+        for col in new_columns:
+            messages.append(f"- {col}")
+    else:
+        messages.append("No new columns were detected.")
+
+    if skipped_columns:
+        messages.append("Missing columns:")
+        for col in sorted(skipped_columns):
+            messages.append(f"- {col}")
+    else:
+        messages.append("No columns were skipped.")
+
+    if inconsistencies:
+        messages.append("Cells with inconsistencies were NOT overwritten.")
+        messages.append("Inconsistencies found:")
+
+        for item in inconsistencies:
+            messages.append(
+                f"- {item['period']} | {item['column']} "
+                f"target {item['target_cell']} / source {item['source_cell']}: "
+                f"target had {item['existing_target_value']}, "
+                f"source has {item['new_source_value']}"
+            )
+    else:
+        messages.append("No inconsistencies found.")
+
+    return messages
+
+
+def run_electricity_transfer(config, save_outputs=False):
     skipped_columns = set()
     inconsistencies = []
+    updated_rows_preview = []
+
+    config = dict(config)
+    config["column_map"] = dict(config["column_map"])
 
     source_wb = openpyxl.load_workbook(config["source_file"], data_only=True)
     source_wb_highlight = openpyxl.load_workbook(config["source_file"], data_only=True)
@@ -250,6 +288,11 @@ def process_electricity(config):
         config,
     )
 
+    period_col = target_headers.get(normalize("Period"))
+
+    if not period_col:
+        raise ValueError("Could not find Period column in target file")
+
     for source_row in range(source_header_row + 1, source_ws.max_row + 1):
         period_value = source_ws.cell(row=source_row, column=source_period_col).value
         period_date = parse_period(period_value)
@@ -264,22 +307,18 @@ def process_electricity(config):
 
         target_row = find_period_row(target_ws, target_headers, period_value)
 
-        period_col = target_headers.get(normalize("Period"))
-
-        if not period_col:
-            raise ValueError("Could not find Period column in target file")
-
         if target_row == target_ws.max_row + 1:
-            format_new_period_row(
-                target_ws,
-                target_row,
-                period_col,
-                period_date,
-            )
+            format_new_period_row(target_ws, target_row, period_col, period_date)
         else:
             period_cell = target_ws.cell(row=target_row, column=period_col)
             period_cell.value = first_day_of_month(period_date)
             period_cell.number_format = "mmm-yy"
+
+        row_preview = {
+            "period": period_value,
+            "target_row": target_row,
+            "values": {},
+        }
 
         for target_col, source_col in config["column_map"].items():
             source_value = get_value(
@@ -296,18 +335,16 @@ def process_electricity(config):
                 skipped_columns.add(target_col)
                 continue
 
-            existing_target_value = resolve_cell_value(
-                target_ws,
-                target_ws.cell(row=target_row, column=target_col_num).value,
-            )
+            target_cell = target_ws.cell(row=target_row, column=target_col_num)
+            old_value = resolve_cell_value(target_ws, target_cell.value)
 
             if (
                 target_col not in new_columns
-                and existing_target_value not in ("", None)
+                and old_value not in ("", None)
                 and source_value not in ("", None)
-                and values_different(existing_target_value, source_value)
+                and values_different(old_value, source_value)
             ):
-                diff = numeric_difference(existing_target_value, source_value)
+                diff = numeric_difference(old_value, source_value)
 
                 if diff is None or diff >= 1:
                     flag_inconsistency(
@@ -320,69 +357,91 @@ def process_electricity(config):
                         inconsistencies,
                         period_value,
                         target_col,
-                        existing_target_value,
+                        old_value,
                         source_value,
                     )
+
+                    target_cell.value = source_value
+
+                    if values_different(old_value, source_value):
+                        row_preview["values"][target_col] = {
+                            "cell": target_cell.coordinate,
+                            "status": "updated",
+                            "old_value": old_value,
+                            "new_value": source_value,
+                            "final_value": source_value,
+                        }
+
                     continue
 
             if source_value in ("", None):
-                pass
+                row_preview["values"][target_col] = {
+                    "cell": target_cell.coordinate,
+                    "status": "blank_source_skipped",
+                    "old_value": old_value,
+                    "new_value": source_value,
+                    "final_value": old_value,
+                }
             else:
-                target_ws.cell(row=target_row, column=target_col_num).value = source_value
+                target_cell.value = source_value
+
+                row_preview["values"][target_col] = {
+                    "cell": target_cell.coordinate,
+                    "status": "updated",
+                    "old_value": old_value,
+                    "new_value": source_value,
+                    "final_value": source_value,
+                }
+
+        if row_preview["values"]:
+            updated_rows_preview.append(row_preview)
 
     keep_only_relevant_sheets(target_wb, config["target_sheet"])
-    target_wb.save(config["target_output_file"])
 
-    source_wb_highlight.save(config["source_output_file"])
+    if save_outputs:
+        target_wb.save(config["target_output_file"])
+        source_wb_highlight.save(config["source_output_file"])
 
-    print(f"\nSuccess. Saved as {config['target_output_file']}")
-    print(f"Highlighted source copy saved as {config['source_output_file']}")
-
-    print(
-        f"This application compared and transferred data only within the "
-        f"last {config['lookback_months']} months "
-        f"({start_date.strftime('%b %y')} to {end_date.strftime('%b %y')})."
+    messages = build_messages(
+        config=config,
+        start_date=start_date,
+        end_date=end_date,
+        new_columns=new_columns,
+        skipped_columns=skipped_columns,
+        inconsistencies=inconsistencies,
+        saved=save_outputs,
     )
 
-    if new_columns:
-        print("\nNew source columns detected and added to output:")
-        for col in new_columns:
-            print(f"- {col}")
-            print(
-                "Previous months were filled with 0, and available source data "
-                "has already been updated in the output Excel file."
-            )
+    return {
+        "updated_rows": updated_rows_preview,
+        "new_columns": new_columns,
+        "skipped_columns": sorted(skipped_columns),
+        "inconsistencies": inconsistencies,
+        "messages": messages,
+        "period_range": {
+            "start": start_date.strftime("%Y-%m-%d"),
+            "end": end_date.strftime("%Y-%m-%d"),
+            "label": f"{start_date.strftime('%b %y')} to {end_date.strftime('%b %y')}",
+        },
+        "saved": save_outputs,
+    }
 
-    if skipped_columns:
-        print("\nMissing columns (possibly due to naming error):")
-        for col in sorted(skipped_columns):
-            print(f"- {col}")
-    else:
-        print("\nNo columns were skipped.")
 
-    if inconsistencies:
-        print("\n=============")
-        print("\nNOTE:")
-        print("Cells with inconsistencies were NOT overwritten.")
-        print("The existing values in the target workbook were preserved.")
+def preview_electricity_transfer(config):
+    return run_electricity_transfer(config, save_outputs=False)
 
-        print("\nInconsistencies found:")
 
-        print("\nSUST office reference - output workbook cell numbers:")
-        for item in inconsistencies:
-            print(
-                f"- {item['period']} | {item['column']} ({item['target_cell']}): "
-                f"SUST had {item['existing_target_value']}, "
-                f"source has {item['new_source_value']}"
-            )
+def apply_electricity_transfer(config, output_mode="duplicate"):
+    if output_mode not in {"amend", "duplicate"}:
+        raise ValueError("output_mode must be 'amend' or 'duplicate'")
 
-        print("\nOther department reference - source workbook cell numbers:")
-        for item in inconsistencies:
-            print(
-                f"- {item['period']} | {item['column']} ({item['source_cell']}): "
-                f"SUST had {item['existing_target_value']}, "
-                f"source has {item['new_source_value']}"
-            )
+    return run_electricity_transfer(config, save_outputs=True)
 
-    else:
-        print("\nNo inconsistencies found.")
+
+def process_electricity(config, preview_mode=False):
+    result = run_electricity_transfer(config, save_outputs=not preview_mode)
+
+    for message in result["messages"]:
+        print(message)
+
+    return result
