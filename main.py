@@ -8,5 +8,5 @@ def load_config(path):
 
 
 if __name__ == "__main__":
-    config = load_config("config/recyclable_wastes.yaml")
+    config = load_config("config/electricity.yaml")
     run_excel_transfer(config)
