@@ -144,9 +144,6 @@ export default function ApplyPanel({ previewResult }) {
           <span className="output-mode-content">
             <strong>
               Duplicate new workbook
-              <span className="recommended-badge">
-                Recommended
-              </span>
             </strong>
 
             <small>
@@ -168,9 +165,7 @@ export default function ApplyPanel({ previewResult }) {
             name="output-mode"
             value="amend"
             checked={outputMode === "amend"}
-            onChange={(event) =>
-              setOutputMode(event.target.value)
-            }
+            disabled
           />
 
           <span className="output-mode-content">
@@ -178,7 +173,7 @@ export default function ApplyPanel({ previewResult }) {
 
             <small>
               Apply the reviewed changes to the selected master
-              workbook. You will be asked to confirm first.
+              workbook. You will be asked to confirm first. COMING SOON
             </small>
           </span>
         </label>
@@ -263,8 +258,3 @@ export default function ApplyPanel({ previewResult }) {
     </section>
   );
 }
-
-await axios.post(
-    "http://127.0.0.1:8000/apply",
-    formData
-);

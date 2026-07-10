@@ -77,37 +77,93 @@ def build_preview_response(category, source_file, target_file):
 
     return result
 
-def build_apply_response(category, source_path, target_path, output_mode="duplicate"):
+def build_apply_response(
+    category,
+    source_path,
+    target_path,
+    output_mode="duplicate",
+):
     category = category.lower().strip()
+    output_mode = output_mode.lower().strip()
+
+    if output_mode not in {"amend", "duplicate"}:
+        raise ValueError(
+            "output_mode must be 'amend' or 'duplicate'"
+        )
+
     run_id = str(uuid.uuid4())
 
     config, config_path = load_category_config(category)
 
     config["source_file"] = source_path
-    config["target_file"] = target_path
+
+    if output_mode == "amend":
+        master_target_path = Path(config["target_file"])
+
+        if not master_target_path.is_absolute():
+            master_target_path = (
+                BASE_DIR / master_target_path
+            ).resolve()
+
+        if not master_target_path.exists():
+            raise FileNotFoundError(
+                f"Master workbook not found: "
+                f"{master_target_path}"
+            )
+
+        config["target_file"] = str(master_target_path)
+
+        # Save directly over the configured master workbook.
+        config["target_output_file"] = str(
+            master_target_path
+        )
+
+    else:
+        # Duplicate starts from the uploaded target copy.
+        config["target_file"] = target_path
+
+        config["target_output_file"] = str(
+            OUTPUT_DIR
+            / f"{run_id}_{category}_applied_output.xlsx"
+        )
 
     config["source_output_file"] = str(
-        OUTPUT_DIR / f"{run_id}_{category}_source_highlighted.xlsx"
-    )
-    config["target_output_file"] = str(
-        OUTPUT_DIR / f"{run_id}_{category}_applied_output.xlsx"
+        OUTPUT_DIR
+        / f"{run_id}_{category}_source_highlighted.xlsx"
     )
 
     if category == "electricity":
-        result = apply_electricity_transfer(config, output_mode=output_mode)
+        result = apply_electricity_transfer(
+            config,
+            output_mode=output_mode,
+        )
     else:
         return {
             "status": "error",
-            "message": f"Unsupported category: {category}",
+            "message": (
+                f"Unsupported category: {category}"
+            ),
         }
 
     result["status"] = "success"
     result["category"] = category
+    result["output_mode"] = output_mode
     result["config_used"] = config_path.name
     result["run_id"] = run_id
     result["source_path"] = source_path
-    result["target_path"] = target_path
+    result["target_path"] = config["target_file"]
     result["output_file"] = config["target_output_file"]
-    result["highlighted_source_file"] = config["source_output_file"]
+    result["highlighted_source_file"] = (
+        config["source_output_file"]
+    )
+
+    if output_mode == "amend":
+        result["message"] = (
+            "The configured master workbook was amended successfully."
+        )
+    else:
+        result["message"] = (
+            "A duplicate workbook was created successfully."
+        )
 
     return result

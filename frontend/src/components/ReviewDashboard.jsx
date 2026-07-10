@@ -1,5 +1,6 @@
 import PreviewTable from "./PreviewTable";
 import InconsistencyTable from "./InconsistencyTable";
+import ApplyPanel from "./ApplyPanel";
 
 export default function ReviewDashboard({ previewResult }) {
   /*
@@ -155,6 +156,10 @@ export default function ReviewDashboard({ previewResult }) {
         rows={updatedRows}
         inconsistencies={inconsistencies}
         newColumns={newColumns}
+      />
+
+      <ApplyPanel
+        previewResult={previewResult}
       />
 
       <InconsistencyTable

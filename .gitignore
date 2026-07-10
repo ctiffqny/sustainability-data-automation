@@ -15,6 +15,7 @@ Thumbs.db
 # react
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
 
 # backend generated files
 backend/temp/
