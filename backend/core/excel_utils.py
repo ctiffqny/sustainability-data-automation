@@ -71,6 +71,30 @@ def find_period_row(ws, headers, period_value):
     return ws.max_row + 1   # add new row if period not found
 
 
+def is_empty_period_row(ws, row_num, headers, column_names):
+    """
+    Return True when a period row exists but all mapped data cells are empty.
+
+    Zero counts as real data.
+    Only None and "" count as empty.
+    """
+    for column_name in column_names:
+        if normalize(column_name) == normalize("Period"):
+            continue
+
+        column_num = headers.get(normalize(column_name))
+
+        if not column_num:
+            continue
+
+        value = ws.cell(row=row_num, column=column_num).value
+
+        if value not in (None, ""):
+            return False
+
+    return True
+
+
 def find_month_row(target_ws, month):
     wanted = normalize_period(month)
 

@@ -14,6 +14,7 @@ from backend.core.excel_utils import (
     find_period_row,
     flag_inconsistency,
     keep_only_relevant_sheets,
+    is_empty_period_row,
 )
 
 from backend.processors.calculation_processor import (
@@ -233,6 +234,39 @@ def build_messages(
 
     return messages
 
+def find_original_placeholder_rows(
+    target_ws,
+    target_header_row,
+    target_headers,
+    column_names,
+):
+    period_col = target_headers.get(normalize("Period"))
+
+    if not period_col:
+        raise ValueError("Could not find Period column in target file")
+
+    placeholder_periods = set()
+
+    for row in range(target_header_row + 1, target_ws.max_row + 1):
+        period_value = target_ws.cell(
+            row=row,
+            column=period_col,
+        ).value
+
+        period_date = parse_period(period_value)
+
+        if period_date is None:
+            continue
+
+        if is_empty_period_row(
+            target_ws,
+            row,
+            target_headers,
+            column_names,
+        ):
+            placeholder_periods.add(first_day_of_month(period_date))
+
+    return placeholder_periods
 
 def run_electricity_transfer(config, save_outputs=False):
     skipped_columns = set()
@@ -276,6 +310,16 @@ def run_electricity_transfer(config, save_outputs=False):
     end_date = max(source_months)
     start_date = subtract_months(end_date, config["lookback_months"])
 
+    source_headers = get_headers(source_ws, source_header_row)
+    target_headers = get_headers(target_ws, target_header_row)
+
+    original_placeholder_periods = find_original_placeholder_rows(
+        target_ws=target_ws,
+        target_header_row=target_header_row,
+        target_headers=target_headers,
+        column_names=config["column_map"].keys(),
+    )
+
     new_columns = add_new_source_columns_to_output(
         source_ws,
         target_ws,
@@ -305,18 +349,48 @@ def run_electricity_transfer(config, save_outputs=False):
         if not (start_date <= period_month <= end_date):
             continue
 
-        target_row = find_period_row(target_ws, target_headers, period_value)
+        target_row = find_period_row(
+            target_ws,
+            target_headers,
+            period_value,
+        )
 
-        if target_row == target_ws.max_row + 1:
-            format_new_period_row(target_ws, target_row, period_col, period_date)
+        row_was_added = target_row == target_ws.max_row + 1
+
+        if row_was_added:
+            row_was_placeholder = False
+
+            format_new_period_row(
+                target_ws,
+                target_row,
+                period_col,
+                period_date,
+            )
         else:
-            period_cell = target_ws.cell(row=target_row, column=period_col)
+            row_was_placeholder = (
+                period_month in original_placeholder_periods
+            )
+
+            period_cell = target_ws.cell(
+                row=target_row,
+                column=period_col,
+            )
             period_cell.value = first_day_of_month(period_date)
             period_cell.number_format = "mmm-yy"
+
+        is_new_row = row_was_added or row_was_placeholder
 
         row_preview = {
             "period": period_value,
             "target_row": target_row,
+            "is_new_row": is_new_row,
+            "row_status": (
+                "added"
+                if row_was_added
+                else "placeholder_filled"
+                if row_was_placeholder
+                else "existing"
+            ),
             "values": {},
         }
 
@@ -385,9 +459,21 @@ def run_electricity_transfer(config, save_outputs=False):
             else:
                 target_cell.value = source_value
 
+                diff = numeric_difference(old_value, source_value)
+                changed = values_different(old_value, source_value)
+
+                if is_new_row:
+                    status = "new_row_value"
+                elif changed and diff is not None and diff < 1:
+                    status = "rounding_update"
+                elif changed:
+                    status = "updated"
+                else:
+                    status = "unchanged"
+
                 row_preview["values"][target_col] = {
                     "cell": target_cell.coordinate,
-                    "status": "updated",
+                    "status": status,
                     "old_value": old_value,
                     "new_value": source_value,
                     "final_value": source_value,

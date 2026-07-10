@@ -1,8 +1,8 @@
-# ignore Excel temporary lock files
+# excel temporary lock files
 ~$*
 .~*
 
-# ignore pycache
+# python
 __pycache__/
 *.py[cod]
 *.pyc
@@ -24,3 +24,6 @@ backend/backups/
 
 # VS Code
 .vscode/
+
+# test file
+ref

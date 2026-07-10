@@ -1,87 +1,145 @@
 import { useState } from "react";
 import axios from "axios";
 
-function UploadForm({ onPreview }) {
+export default function UploadForm({ onPreview }) {
   const [category, setCategory] = useState("electricity");
   const [sourceFile, setSourceFile] = useState(null);
   const [targetFile, setTargetFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  async function handlePreview() {
+  async function handlePreview(event) {
+    event.preventDefault();
+
     if (!sourceFile || !targetFile) {
-        alert("Please select both workbooks.");
-        return;
+      setErrorMessage("Please select both workbooks.");
+      return;
     }
+
+    setLoading(true);
+    setErrorMessage("");
+    onPreview(null);
 
     try {
-        const formData = new FormData();
+      const formData = new FormData();
 
-        formData.append("category", category);
-        formData.append("source_file", sourceFile);
-        formData.append("target_file", targetFile);
+      formData.append("category", category);
+      formData.append("source_file", sourceFile);
+      formData.append("target_file", targetFile);
 
-        const response = await axios.post(
+      const response = await axios.post(
         "http://127.0.0.1:8000/preview",
         formData
+      );
+
+      if (response.data.status === "error") {
+        setErrorMessage(
+          response.data.message ?? "Preview failed."
         );
+        return;
+      }
 
-        onPreview(response.data);
-
+      onPreview(response.data);
     } catch (error) {
-        console.error(error);
+      console.error(error);
 
-        if (error.response) {
-        console.log(error.response.data);
-        alert(`Backend Error: ${error.response.status}`);
-        } else {
-        alert("Could not connect to backend.");
-        }
+      if (error.response?.data?.detail) {
+        setErrorMessage(
+          JSON.stringify(error.response.data.detail)
+        );
+      } else if (error.response) {
+        setErrorMessage(
+          `Backend error: ${error.response.status}`
+        );
+      } else {
+        setErrorMessage(
+          "Could not connect to the backend."
+        );
+      }
+    } finally {
+      setLoading(false);
     }
-    }
+  }
+
   return (
-    <div>
+    <form
+      className="upload-form"
+      onSubmit={handlePreview}
+    >
       <h2>Upload Files</h2>
 
-      <div>
-        <label>Category</label>
-        <br />
+      <div className="form-field">
+        <label htmlFor="category">Category</label>
+
         <select
+          id="category"
           value={category}
-          onChange={(event) => setCategory(event.target.value)}
+          onChange={(event) =>
+            setCategory(event.target.value)
+          }
         >
-          <option value="electricity">Electricity</option>
-          <option value="recyclable_wastes">Recyclable Wastes</option>
+          <option value="electricity">
+            Electricity
+          </option>
+
+          <option value="recyclable_wastes">
+            Recyclable Wastes
+          </option>
         </select>
       </div>
 
-      <br />
+      <div className="form-field">
+        <label htmlFor="source-file">
+          Source Workbook
+        </label>
 
-      <div>
-        <label>Source Workbook</label>
-        <br />
         <input
+          id="source-file"
           type="file"
-          accept=".xlsx,.xlsm,.xls"
-          onChange={(event) => setSourceFile(event.target.files[0])}
+          accept=".xlsx,.xlsm"
+          onChange={(event) =>
+            setSourceFile(event.target.files?.[0] ?? null)
+          }
         />
+
+        {sourceFile && (
+          <small>{sourceFile.name}</small>
+        )}
       </div>
 
-      <br />
+      <div className="form-field">
+        <label htmlFor="target-file">
+          Target Workbook
+        </label>
 
-      <div>
-        <label>Target Workbook</label>
-        <br />
         <input
+          id="target-file"
           type="file"
-          accept=".xlsx,.xlsm,.xls"
-          onChange={(event) => setTargetFile(event.target.files[0])}
+          accept=".xlsx,.xlsm"
+          onChange={(event) =>
+            setTargetFile(event.target.files?.[0] ?? null)
+          }
         />
+
+        {targetFile && (
+          <small>{targetFile.name}</small>
+        )}
       </div>
 
-      <br />
+      {errorMessage && (
+        <div className="error-message">
+          {errorMessage}
+        </div>
+      )}
 
-      <button onClick={handlePreview}>Preview Changes</button>
-    </div>
+      <button
+        type="submit"
+        disabled={loading}
+      >
+        {loading
+          ? "Generating preview..."
+          : "Preview Changes"}
+      </button>
+    </form>
   );
 }
-
-export default UploadForm;

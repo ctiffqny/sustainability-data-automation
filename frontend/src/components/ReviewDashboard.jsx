@@ -1,0 +1,165 @@
+import PreviewTable from "./PreviewTable";
+import InconsistencyTable from "./InconsistencyTable";
+
+export default function ReviewDashboard({ previewResult }) {
+  /*
+   * Supports both response shapes:
+   *
+   * 1. Direct:
+   *    {
+   *      status: "success",
+   *      category: "electricity",
+   *      updated_rows: [...],
+   *      inconsistencies: [...],
+   *      new_columns: [...],
+   *      skipped_columns: [...]
+   *    }
+   *
+   * 2. Wrapped:
+   *    {
+   *      status: "success",
+   *      category: "electricity",
+   *      preview: {
+   *        updated_rows: [...],
+   *        inconsistencies: [...],
+   *        new_columns: [...],
+   *        skipped_columns: [...]
+   *      }
+   *    }
+   */
+
+  const preview = previewResult?.preview ?? previewResult ?? {};
+
+  const updatedRows = Array.isArray(preview.updated_rows)
+    ? preview.updated_rows
+    : [];
+
+  const inconsistencies = Array.isArray(preview.inconsistencies)
+    ? preview.inconsistencies
+    : [];
+
+  const newColumns = Array.isArray(preview.new_columns)
+    ? preview.new_columns
+    : [];
+
+  const skippedColumns = Array.isArray(preview.skipped_columns)
+    ? preview.skipped_columns
+    : [];
+
+  const status =
+    previewResult?.status ??
+    preview.status ??
+    "success";
+
+  const category =
+    previewResult?.category ??
+    preview.category ??
+    "Unknown";
+
+  /*
+   * Use a backend-provided reviewed-row count when available.
+   * Otherwise, fall back to the number of updated rows.
+   */
+  const rowsReviewed =
+    preview.rows_reviewed ??
+    previewResult?.rows_reviewed ??
+    updatedRows.length;
+
+  const formatValue = (value) => {
+    if (
+      value === null ||
+      value === undefined ||
+      value === ""
+    ) {
+      return "None";
+    }
+
+    if (Array.isArray(value)) {
+      return value.length > 0
+        ? value.join(", ")
+        : "None";
+    }
+
+    return String(value);
+  };
+
+  return (
+    <section className="review-dashboard">
+      <section className="summary-card">
+        <h2>Preview Summary</h2>
+
+        <div className="summary-grid">
+          <div className="summary-item">
+            <span className="summary-label">
+              Status
+            </span>
+
+            <span className="summary-value">
+              {formatValue(status)}
+            </span>
+          </div>
+
+          <div className="summary-item">
+            <span className="summary-label">
+              Category
+            </span>
+
+            <span className="summary-value">
+              {formatValue(category)}
+            </span>
+          </div>
+
+          <div className="summary-item">
+            <span className="summary-label">
+              Rows reviewed
+            </span>
+
+            <span className="summary-value">
+              {formatValue(rowsReviewed)}
+            </span>
+          </div>
+
+          <div className="summary-item">
+            <span className="summary-label">
+              Inconsistencies
+            </span>
+
+            <span className="summary-value">
+              {inconsistencies.length}
+            </span>
+          </div>
+
+          <div className="summary-item">
+            <span className="summary-label">
+              New columns
+            </span>
+
+            <span className="summary-value">
+              {formatValue(newColumns)}
+            </span>
+          </div>
+
+          <div className="summary-item">
+            <span className="summary-label">
+              Skipped columns
+            </span>
+
+            <span className="summary-value summary-warning">
+              {formatValue(skippedColumns)}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <PreviewTable
+        rows={updatedRows}
+        inconsistencies={inconsistencies}
+        newColumns={newColumns}
+      />
+
+      <InconsistencyTable
+        inconsistencies={inconsistencies}
+      />
+    </section>
+  );
+}
