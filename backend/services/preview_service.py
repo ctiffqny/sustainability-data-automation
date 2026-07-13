@@ -8,6 +8,16 @@ from backend.processors.electricity_processor import (
     apply_electricity_transfer,
 )
 
+from backend.processors.recyclable_wastes_processor import (
+    preview_recyclable_wastes_transfer,
+    apply_recyclable_wastes_transfer,
+)
+
+from backend.processors.recyclable_wastes_processor import (
+    preview_recyclable_wastes_transfer,
+    apply_recyclable_wastes_transfer,
+)
+
 BASE_DIR = Path(__file__).resolve().parents[1]
 CONFIG_DIR = BASE_DIR / "config"
 TEMP_DIR = BASE_DIR / "temp"
@@ -62,6 +72,10 @@ def build_preview_response(category, source_file, target_file):
 
     if category == "electricity":
         result = preview_electricity_transfer(config)
+
+    elif category == "recyclable_wastes":
+        result = preview_recyclable_wastes_transfer(config)
+
     else:
         return {
             "status": "error",
@@ -137,6 +151,13 @@ def build_apply_response(
             config,
             output_mode=output_mode,
         )
+
+    elif category == "recyclable_wastes":
+        result = apply_recyclable_wastes_transfer(
+            config,
+            output_mode=output_mode,
+        )
+    
     else:
         return {
             "status": "error",

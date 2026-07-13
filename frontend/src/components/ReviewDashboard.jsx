@@ -156,6 +156,7 @@ export default function ReviewDashboard({ previewResult }) {
         rows={updatedRows}
         inconsistencies={inconsistencies}
         newColumns={newColumns}
+        category={category}
       />
 
       <ApplyPanel

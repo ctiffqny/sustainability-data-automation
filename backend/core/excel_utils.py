@@ -26,6 +26,20 @@ def find_first_header_row(ws, required_header="Period"):
 
     raise ValueError(f"Could not find first header row containing {required_header}")
 
+def find_last_period_row(ws, period_col, header_row):
+    """
+    Return the last worksheet row containing a valid period.
+    Rows below it, such as yellow summary rows, are excluded.
+    """
+    last_row = header_row
+
+    for row in range(header_row + 1, ws.max_row + 1):
+        value = ws.cell(row=row, column=period_col).value
+
+        if parse_period(value) is not None:
+            last_row = row
+
+    return last_row
 
 def get_headers(ws, header_row):
     headers = {}

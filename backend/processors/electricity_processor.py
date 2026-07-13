@@ -12,6 +12,7 @@ from backend.core.excel_utils import (
     get_headers,
     get_value,
     find_period_row,
+    find_last_period_row,
     flag_inconsistency,
     keep_only_relevant_sheets,
     is_empty_period_row,
@@ -26,6 +27,8 @@ from backend.processors.calculation_processor import (
 from backend.core.excel_format_utils import (
     copy_cell_format,
     copy_column_format_from_source,
+    copy_placeholder_formats_from_target,
+
 )
 
 from backend.core.excel_layout_utils import (
@@ -58,7 +61,17 @@ def add_new_source_columns_to_output(
     start_date,
     end_date,
     config,
+    source_last_period_row,
 ):
+    
+    row_offset = target_header_row - source_header_row
+
+    first_placeholder_row = (
+        source_last_period_row
+        + row_offset
+        + 1
+    )
+
     new_columns = []
 
     mapped_source_columns = {
@@ -113,6 +126,7 @@ def add_new_source_columns_to_output(
                     new_col_num,
                     source_header_row,
                     target_header_row,
+                    source_last_row=source_last_period_row,
                 )
 
                 new_col_num += 1
@@ -126,9 +140,26 @@ def add_new_source_columns_to_output(
                 new_col_num,
                 source_header_row,
                 target_header_row,
+                source_last_row=source_last_period_row,
             )
 
-            target_ws.cell(row=target_header_row, column=new_col_num).value = source_header_name
+            period_col = target_headers.get(normalize("Period"))
+
+            if not period_col:
+                raise ValueError("Could not find Period column in target file")
+            
+            copy_placeholder_formats_from_target(
+                target_ws=target_ws,
+                template_col=previous_target_col,
+                target_col=new_col_num,
+                period_col=period_col,
+                first_placeholder_row=first_placeholder_row,
+            )
+
+            target_ws.cell(
+                row=target_header_row,
+                column=new_col_num,
+            ).value = source_header_name
 
             source_separator_col = source_col_num + 1
 
@@ -148,6 +179,7 @@ def add_new_source_columns_to_output(
                     target_separator_col,
                     source_header_row,
                     target_header_row,
+                    source_last_row=source_last_period_row,
                 )
 
             target_headers.clear()
@@ -294,10 +326,16 @@ def run_electricity_transfer(config, save_outputs=False):
 
     if not source_period_col:
         raise ValueError("Could not find Period column in source file")
+    
+    last_period_row = find_last_period_row(
+        source_ws,
+        source_period_col,
+        source_header_row,
+    )
 
     source_months = []
 
-    for source_row in range(source_header_row + 1, source_ws.max_row + 1):
+    for source_row in range(source_header_row + 1, last_period_row + 1):
         period_value = source_ws.cell(row=source_row, column=source_period_col).value
         period_date = parse_period(period_value)
 
@@ -330,6 +368,7 @@ def run_electricity_transfer(config, save_outputs=False):
         start_date,
         end_date,
         config,
+        last_period_row,
     )
 
     period_col = target_headers.get(normalize("Period"))
@@ -337,7 +376,7 @@ def run_electricity_transfer(config, save_outputs=False):
     if not period_col:
         raise ValueError("Could not find Period column in target file")
 
-    for source_row in range(source_header_row + 1, source_ws.max_row + 1):
+    for source_row in range(source_header_row + 1, last_period_row + 1):
         period_value = source_ws.cell(row=source_row, column=source_period_col).value
         period_date = parse_period(period_value)
 

@@ -2,6 +2,7 @@ export default function PreviewTable({
   rows,
   inconsistencies = [],
   newColumns = [],
+  category,
 }) {
   if (!rows || rows.length === 0) {
     return (
@@ -35,17 +36,78 @@ export default function PreviewTable({
   );
 
   function formatPeriod(period) {
-    const date = new Date(period);
+  if (
+    period === null ||
+    period === undefined ||
+    period === ""
+  ) {
+    return "";
+  }
 
-    if (Number.isNaN(date.getTime())) {
-      return period;
+  // Handles values such as MAY-26, May-26, or May 26.
+  if (typeof period === "string") {
+    const cleaned = period.trim();
+
+    const monthYearMatch = cleaned.match(
+      /^([A-Za-z]{3,9})[\s-](\d{2}|\d{4})$/
+    );
+
+    if (monthYearMatch) {
+      const [, monthText, yearText] = monthYearMatch;
+
+      const monthLookup = {
+        jan: "Jan",
+        january: "Jan",
+        feb: "Feb",
+        february: "Feb",
+        mar: "Mar",
+        march: "Mar",
+        apr: "Apr",
+        april: "Apr",
+        may: "May",
+        jun: "Jun",
+        june: "Jun",
+        jul: "Jul",
+        july: "Jul",
+        aug: "Aug",
+        august: "Aug",
+        sep: "Sep",
+        sept: "Sep",
+        september: "Sep",
+        oct: "Oct",
+        october: "Oct",
+        nov: "Nov",
+        november: "Nov",
+        dec: "Dec",
+        december: "Dec",
+      };
+
+      const formattedMonth =
+        monthLookup[monthText.toLowerCase()];
+
+      if (formattedMonth) {
+        const formattedYear =
+          yearText.length === 4
+            ? yearText.slice(-2)
+            : yearText;
+
+        return `${formattedMonth} ${formattedYear}`;
+      }
     }
+  }
 
+  // Handles full ISO dates such as 2026-05-01.
+  const date = new Date(period);
+
+  if (!Number.isNaN(date.getTime())) {
     return date.toLocaleDateString("en-GB", {
       month: "short",
       year: "2-digit",
     });
   }
+
+  return String(period);
+}
 
   function formatValue(value) {
     if (
@@ -141,6 +203,13 @@ export default function PreviewTable({
           <p>
             This shows how the transferred data will appear before
             changes are applied.
+
+            {category === "recyclable_wastes" && (
+                <>
+                <br />
+                <strong>Note:</strong> Values should have been converted from tonnes to kg.
+                </>
+            ) }
           </p>
         </div>
 

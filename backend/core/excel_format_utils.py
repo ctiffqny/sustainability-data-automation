@@ -19,6 +19,7 @@ def copy_column_format_from_source(
     target_col,
     source_header_row,
     target_header_row,
+    source_last_row=None,
 ):
     target_ws.column_dimensions[get_column_letter(target_col)].width = (
         source_ws.column_dimensions[get_column_letter(source_col)].width
@@ -26,7 +27,10 @@ def copy_column_format_from_source(
 
     row_offset = target_header_row - source_header_row
 
-    for source_row in range(1, source_ws.max_row + 1):
+    if source_last_row is None:
+        source_last_row = source_ws.max_row
+
+    for source_row in range(1, source_last_row + 1):
         target_row = source_row + row_offset
 
         if target_row < 1 or target_row > target_ws.max_row:
@@ -34,6 +38,29 @@ def copy_column_format_from_source(
 
         copy_cell_format(
             source_ws.cell(row=source_row, column=source_col),
+            target_ws.cell(row=target_row, column=target_col),
+        )
+
+def copy_placeholder_formats_from_target(
+    target_ws,
+    template_col,
+    target_col,
+    period_col,
+    first_placeholder_row,
+):
+    from backend.core.period_utils import parse_period
+
+    for target_row in range(first_placeholder_row, target_ws.max_row + 1):
+        period_value = target_ws.cell(
+            row=target_row,
+            column=period_col,
+        ).value
+
+        if parse_period(period_value) is None:
+            continue
+
+        copy_cell_format(
+            target_ws.cell(row=target_row, column=template_col),
             target_ws.cell(row=target_row, column=target_col),
         )
 

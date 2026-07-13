@@ -106,6 +106,9 @@ export default function ApplyPanel({ previewResult }) {
     return `${API_BASE_URL}/download?${query.toString()}`;
   }
 
+  const supportsHighlightedSource =
+  previewResult?.category === "electricity";
+
   return (
     <section className="apply-panel">
       <div className="apply-panel-heading">
@@ -215,7 +218,7 @@ export default function ApplyPanel({ previewResult }) {
           <h3>Changes applied successfully</h3>
 
           <p>
-            The reviewed electricity data has been processed.
+            The reviewed {previewResult.category?.replaceAll("_", " ")} data has been processed.
             Download the generated files below.
           </p>
 
@@ -231,16 +234,25 @@ export default function ApplyPanel({ previewResult }) {
               </a>
             )}
 
-            {applyResult.highlighted_source_file && (
-              <a
-                className="download-button"
-                href={createDownloadUrl(
-                  applyResult.highlighted_source_file
+            {supportsHighlightedSource ? (
+                <a
+                    className="download-button"
+                    href={createDownloadUrl(
+                    applyResult.highlighted_source_file
+                    )}
+                >
+                    Download highlighted source
+                </a>
+                ) : (
+                <button
+                    type="button"
+                    className="download-button"
+                    disabled
+                    title="Not available for Recyclable Wastes."
+                >
+                    Download highlighted source
+                </button>
                 )}
-              >
-                Download highlighted source
-              </a>
-            )}
           </div>
 
           <button

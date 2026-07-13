@@ -9,57 +9,80 @@ export default function UploadForm({ onPreview }) {
   const [errorMessage, setErrorMessage] = useState("");
 
   async function handlePreview(event) {
-    event.preventDefault();
+  event.preventDefault();
 
-    if (!sourceFile || !targetFile) {
-      setErrorMessage("Please select both workbooks.");
+  if (!(sourceFile instanceof File) || !(targetFile instanceof File)) {
+    setErrorMessage("Please select both workbooks again.");
+    return;
+  }
+
+  setLoading(true);
+  setErrorMessage("");
+  onPreview(null);
+
+  try {
+    const formData = new FormData();
+
+    formData.append("category", category);
+
+    formData.append(
+      "source_file",
+      sourceFile,
+      sourceFile.name
+    );
+
+    formData.append(
+      "target_file",
+      targetFile,
+      targetFile.name
+    );
+
+    console.log({
+      sourceFile,
+      sourceIsFile: sourceFile instanceof File,
+      targetFile,
+      targetIsFile: targetFile instanceof File,
+    });
+
+    const response = await axios.post(
+      "http://127.0.0.1:8000/preview",
+      formData
+    );
+
+    if (response.data?.status === "error") {
+      setErrorMessage(
+        response.data.message ?? "Preview failed."
+      );
       return;
     }
 
-    setLoading(true);
-    setErrorMessage("");
-    onPreview(null);
+    onPreview(response.data);
+  } catch (error) {
+    console.error("Preview failed:", error);
 
-    try {
-      const formData = new FormData();
+    const detail = error.response?.data?.detail;
 
-      formData.append("category", category);
-      formData.append("source_file", sourceFile);
-      formData.append("target_file", targetFile);
-
-      const response = await axios.post(
-        "http://127.0.0.1:8000/preview",
-        formData
+    if (detail) {
+      setErrorMessage(
+        typeof detail === "string"
+          ? detail
+          : detail
+              .map((item) => item.msg)
+              .join(", ")
       );
-
-      if (response.data.status === "error") {
-        setErrorMessage(
-          response.data.message ?? "Preview failed."
-        );
-        return;
-      }
-
-      onPreview(response.data);
-    } catch (error) {
-      console.error(error);
-
-      if (error.response?.data?.detail) {
-        setErrorMessage(
-          JSON.stringify(error.response.data.detail)
-        );
-      } else if (error.response) {
-        setErrorMessage(
-          `Backend error: ${error.response.status}`
-        );
-      } else {
-        setErrorMessage(
-          "Could not connect to the backend."
-        );
-      }
-    } finally {
-      setLoading(false);
+    } else if (error.response) {
+      setErrorMessage(
+        `Backend error: ${error.response.status}`
+      );
+    } else {
+      setErrorMessage(
+        "Could not connect to the backend."
+      );
     }
+  } finally {
+    setLoading(false);
   }
+}
 
   return (
     <form
