@@ -1,6 +1,7 @@
 import PreviewTable from "./PreviewTable";
 import InconsistencyTable from "./InconsistencyTable";
 import ApplyPanel from "./ApplyPanel";
+import ProcessedDataTable from "./ProcessedDataTable";
 
 export default function ReviewDashboard({ previewResult }) {
   /*
@@ -33,6 +34,12 @@ export default function ReviewDashboard({ previewResult }) {
 
   const updatedRows = Array.isArray(preview.updated_rows)
     ? preview.updated_rows
+    : [];
+
+  const processedRows = Array.isArray(
+    preview.processed_rows
+  )
+    ? preview.processed_rows
     : [];
 
   const inconsistencies = Array.isArray(preview.inconsistencies)
@@ -158,6 +165,22 @@ export default function ReviewDashboard({ previewResult }) {
         newColumns={newColumns}
         category={category}
       />
+
+      {processedRows.length > 0 && (
+        <ProcessedDataTable
+            rows={processedRows}
+            title={
+            category === "recyclable_wastes"
+                ? "Processed Solid Waste Data"
+                : "Processed Data"
+            }
+            description={
+            category === "recyclable_wastes"
+                ? "These values were calculated by the backend using the rules configured in the recyclable waste YAML file. Yearly Total Waste Generated only applies every June."
+                : "These values were calculated by the backend."
+            }
+        />
+        )}
 
       <ApplyPanel
         previewResult={previewResult}

@@ -453,6 +453,161 @@ def build_recyclable_waste_preview(
         }
     ]
 
+def build_processed_waste_preview(
+    generated_file,
+    config,
+):
+    """
+    Read the already-calculated values from the processed waste
+    worksheet.
+
+    The displayed columns and month selection come entirely from
+    recyclable_wastes.yaml.
+    """
+    workbook = openpyxl.load_workbook(
+        generated_file,
+        data_only=True,
+    )
+
+    worksheet = workbook[
+        config["calculation_target_sheet"]
+    ]
+
+    header_row = 1
+    headers = get_headers(
+        worksheet,
+        header_row,
+    )
+
+    calculations = config.get(
+        "calculations",
+        {},
+    )
+
+    # Keep the same order as the calculations in the YAML file.
+    output_columns = [
+        calculation["output_column"]
+        for calculation in calculations.values()
+        if calculation.get("output_column")
+    ]
+
+    month_settings = config.get(
+        "calculation_months",
+        {},
+    )
+    mode = month_settings.get(
+        "mode",
+        "all",
+    )
+
+    worksheet_rows = []
+
+    for row_number in range(
+        header_row + 1,
+        worksheet.max_row + 1,
+    ):
+        period = worksheet.cell(
+            row=row_number,
+            column=1,
+        ).value
+
+        if period in ("", None):
+            continue
+
+        worksheet_rows.append(
+            {
+                "row_number": row_number,
+                "period": period,
+                "normalized_period": normalize_period(
+                    period
+                ),
+            }
+        )
+
+    if mode == "selected":
+        selected_periods = {
+            normalize_period(period)
+            for period in month_settings.get(
+                "months",
+                [],
+            )
+        }
+
+        selected_rows = [
+            row
+            for row in worksheet_rows
+            if row["normalized_period"]
+            in selected_periods
+        ]
+
+    elif mode == "range":
+        start_period = normalize_period(
+            month_settings["start"]
+        )
+        end_period = normalize_period(
+            month_settings["end"]
+        )
+
+        selected_rows = []
+        inside_range = False
+
+        for row in worksheet_rows:
+            current_period = row[
+                "normalized_period"
+            ]
+
+            if current_period == start_period:
+                inside_range = True
+
+            if inside_range:
+                selected_rows.append(row)
+
+            if current_period == end_period:
+                break
+
+    elif mode == "all":
+        selected_rows = worksheet_rows
+
+    else:
+        raise ValueError(
+            "Unsupported calculation_months mode "
+            f"for preview: {mode}"
+        )
+
+    processed_rows = []
+
+    for selected_row in selected_rows:
+        row_number = selected_row["row_number"]
+        values = {}
+
+        for output_column in output_columns:
+            column_number = headers.get(
+                normalize(output_column)
+            )
+
+            if not column_number:
+                continue
+
+            cell = worksheet.cell(
+                row=row_number,
+                column=column_number,
+            )
+
+            values[output_column] = {
+                "cell": cell.coordinate,
+                "final_value": cell.value,
+            }
+
+        processed_rows.append(
+            {
+                "period": selected_row["period"],
+                "target_row": row_number,
+                "values": values,
+            }
+        )
+
+    return processed_rows
+
 
 def run_recyclable_wastes_transfer(
     config,
@@ -478,6 +633,15 @@ def run_recyclable_wastes_transfer(
             ],
             config=config,
             generation_result=generation_result,
+        )
+    )
+
+    processed_rows = (
+        build_processed_waste_preview(
+            generated_file=generation_result[
+                "output_path"
+            ],
+            config=config,
         )
     )
 
@@ -530,6 +694,7 @@ def run_recyclable_wastes_transfer(
 
     return {
         "updated_rows": updated_rows,
+        "processed_rows": processed_rows,
         "new_columns": [],
         "skipped_columns": generation_result[
             "skipped_columns"
@@ -554,19 +719,7 @@ def preview_recyclable_wastes_transfer(config):
     )
 
 
-def apply_recyclable_wastes_transfer(
-    config,
-    output_mode="duplicate",
-):
-    if output_mode not in {
-        "duplicate",
-        "amend",
-    }:
-        raise ValueError(
-            "output_mode must be "
-            "'duplicate' or 'amend'"
-        )
-
+def apply_recyclable_wastes_transfer(config):
     return run_recyclable_wastes_transfer(
         config,
         save_outputs=True,

@@ -4,7 +4,6 @@ import axios from "axios";
 const API_BASE_URL = "http://127.0.0.1:8000";
 
 export default function ApplyPanel({ previewResult }) {
-  const [outputMode, setOutputMode] = useState("duplicate");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [applyResult, setApplyResult] = useState(null);
@@ -14,7 +13,6 @@ export default function ApplyPanel({ previewResult }) {
    * a different preview.
    */
   useEffect(() => {
-    setOutputMode("duplicate");
     setErrorMessage("");
     setApplyResult(null);
   }, [previewResult?.run_id]);
@@ -31,19 +29,6 @@ export default function ApplyPanel({ previewResult }) {
       return;
     }
 
-    /*
-     * Extra confirmation for the destructive-looking option.
-     */
-    if (outputMode === "amend") {
-      const confirmed = window.confirm(
-        "You selected “Amend master copy”. This may replace the master workbook with the reviewed changes.\n\nContinue?"
-      );
-
-      if (!confirmed) {
-        return;
-      }
-    }
-
     setLoading(true);
     setErrorMessage("");
     setApplyResult(null);
@@ -54,7 +39,6 @@ export default function ApplyPanel({ previewResult }) {
       formData.append("category", previewResult.category);
       formData.append("source_path", previewResult.source_path);
       formData.append("target_path", previewResult.target_path);
-      formData.append("output_mode", outputMode);
 
       const response = await axios.post(
         `${API_BASE_URL}/apply`,
@@ -111,83 +95,6 @@ export default function ApplyPanel({ previewResult }) {
 
   return (
     <section className="apply-panel">
-      <div className="apply-panel-heading">
-        <div>
-          <h2>Apply Changes</h2>
-
-          <p>
-            Choose how the reviewed changes should be saved.
-          </p>
-        </div>
-      </div>
-
-      <fieldset
-        className="output-mode-options"
-        disabled={loading}
-      >
-        <legend>Output option</legend>
-
-        <label
-          className={`output-mode-card ${
-            outputMode === "duplicate"
-              ? "output-mode-card-selected"
-              : ""
-          }`}
-        >
-          <input
-            type="radio"
-            name="output-mode"
-            value="duplicate"
-            checked={outputMode === "duplicate"}
-            onChange={(event) =>
-              setOutputMode(event.target.value)
-            }
-          />
-
-          <span className="output-mode-content">
-            <strong>
-              Duplicate new workbook
-            </strong>
-
-            <small>
-              Keep the uploaded target unchanged and create a
-              separate workbook containing the reviewed changes.
-            </small>
-          </span>
-        </label>
-
-        <label
-          className={`output-mode-card output-mode-card-warning ${
-            outputMode === "amend"
-              ? "output-mode-card-selected"
-              : ""
-          }`}
-        >
-          <input
-            type="radio"
-            name="output-mode"
-            value="amend"
-            checked={outputMode === "amend"}
-            disabled
-          />
-
-          <span className="output-mode-content">
-            <strong>Amend master copy</strong>
-
-            <small>
-              Apply the reviewed changes to the selected master
-              workbook. You will be asked to confirm first. COMING SOON
-            </small>
-          </span>
-        </label>
-      </fieldset>
-
-      {outputMode === "amend" && !applyResult && (
-        <div className="apply-warning" role="alert">
-          <strong>Review carefully.</strong> The amend option is
-          intended for updating the master workbook.
-        </div>
-      )}
 
       {errorMessage && (
         <div className="error-message" role="alert">
@@ -204,8 +111,6 @@ export default function ApplyPanel({ previewResult }) {
         >
           {loading
             ? "Applying changes..."
-            : outputMode === "amend"
-              ? "Confirm and Amend Master Copy"
               : "Create Updated Workbook"}
         </button>
       )}

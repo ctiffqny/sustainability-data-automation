@@ -48,14 +48,12 @@ async def apply(
     category: str = Form(...),
     source_path: str = Form(...),
     target_path: str = Form(...),
-    output_mode: str = Form("duplicate"),
 ):
     try:
         return build_apply_response(
             category=category,
             source_path=source_path,
             target_path=target_path,
-            output_mode=output_mode,
         )
     except FileNotFoundError as error:
         return {

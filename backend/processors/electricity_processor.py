@@ -556,12 +556,11 @@ def preview_electricity_transfer(config):
     return run_electricity_transfer(config, save_outputs=False)
 
 
-def apply_electricity_transfer(config, output_mode="duplicate"):
-    if output_mode not in {"amend", "duplicate"}:
-        raise ValueError("output_mode must be 'amend' or 'duplicate'")
-
-    return run_electricity_transfer(config, save_outputs=True)
-
+def apply_electricity_transfer(config):
+    return run_electricity_transfer(
+        config,
+        save_outputs=True,
+    )
 
 def process_electricity(config, preview_mode=False):
     result = run_electricity_transfer(config, save_outputs=not preview_mode)

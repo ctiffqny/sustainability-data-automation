@@ -13,11 +13,6 @@ from backend.processors.recyclable_wastes_processor import (
     apply_recyclable_wastes_transfer,
 )
 
-from backend.processors.recyclable_wastes_processor import (
-    preview_recyclable_wastes_transfer,
-    apply_recyclable_wastes_transfer,
-)
-
 BASE_DIR = Path(__file__).resolve().parents[1]
 CONFIG_DIR = BASE_DIR / "config"
 TEMP_DIR = BASE_DIR / "temp"
@@ -95,15 +90,8 @@ def build_apply_response(
     category,
     source_path,
     target_path,
-    output_mode="duplicate",
 ):
     category = category.lower().strip()
-    output_mode = output_mode.lower().strip()
-
-    if output_mode not in {"amend", "duplicate"}:
-        raise ValueError(
-            "output_mode must be 'amend' or 'duplicate'"
-        )
 
     run_id = str(uuid.uuid4())
 
@@ -111,35 +99,13 @@ def build_apply_response(
 
     config["source_file"] = source_path
 
-    if output_mode == "amend":
-        master_target_path = Path(config["target_file"])
+    # Duplicate starts from the uploaded target copy.
+    config["target_file"] = target_path
 
-        if not master_target_path.is_absolute():
-            master_target_path = (
-                BASE_DIR / master_target_path
-            ).resolve()
-
-        if not master_target_path.exists():
-            raise FileNotFoundError(
-                f"Master workbook not found: "
-                f"{master_target_path}"
-            )
-
-        config["target_file"] = str(master_target_path)
-
-        # Save directly over the configured master workbook.
-        config["target_output_file"] = str(
-            master_target_path
-        )
-
-    else:
-        # Duplicate starts from the uploaded target copy.
-        config["target_file"] = target_path
-
-        config["target_output_file"] = str(
-            OUTPUT_DIR
-            / f"{run_id}_{category}_applied_output.xlsx"
-        )
+    config["target_output_file"] = str(
+        OUTPUT_DIR
+        / f"{run_id}_{category}_applied_output.xlsx"
+    )
 
     config["source_output_file"] = str(
         OUTPUT_DIR
@@ -149,13 +115,11 @@ def build_apply_response(
     if category == "electricity":
         result = apply_electricity_transfer(
             config,
-            output_mode=output_mode,
         )
 
     elif category == "recyclable_wastes":
         result = apply_recyclable_wastes_transfer(
             config,
-            output_mode=output_mode,
         )
     
     else:
@@ -168,7 +132,6 @@ def build_apply_response(
 
     result["status"] = "success"
     result["category"] = category
-    result["output_mode"] = output_mode
     result["config_used"] = config_path.name
     result["run_id"] = run_id
     result["source_path"] = source_path
@@ -178,13 +141,8 @@ def build_apply_response(
         config["source_output_file"]
     )
 
-    if output_mode == "amend":
-        result["message"] = (
-            "The configured master workbook was amended successfully."
-        )
-    else:
-        result["message"] = (
-            "A duplicate workbook was created successfully."
-        )
+    result["message"] = (
+        "A duplicate workbook was created successfully."
+    )
 
     return result
