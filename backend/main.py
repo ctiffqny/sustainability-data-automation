@@ -4,6 +4,7 @@ from backend.services.preview_service import build_preview_response, build_apply
 from backend.services.preview_service import build_preview_response
 from fastapi.responses import FileResponse
 from pathlib import Path
+from backend.api.pdf_routes import router as pdf_router
 
 app = FastAPI(title="Sustainability Data Automation API")
 
@@ -18,6 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(pdf_router)
 
 @app.get("/")
 def root():
@@ -25,22 +27,20 @@ def root():
 
 
 @app.post("/preview")
-async def preview(
+def preview(
     category: str = Form(...),
-    source_file: UploadFile = File(...),
     target_file: UploadFile = File(...),
+    source_file: UploadFile | None = File(None),
+    source_files: list[UploadFile] | None = File(None),
+    month: str | None = Form(None),
 ):
-    try:
-        return build_preview_response(
-            category,
-            source_file,
-            target_file,
-        )
-    except (FileNotFoundError, ValueError) as error:
-        return {
-            "status": "error",
-            "message": str(error),
-        }
+    return build_preview_response(
+        category=category,
+        source_file=source_file,
+        source_files=source_files,
+        target_file=target_file,
+        month=month,
+    )
     
 
 @app.post("/apply")

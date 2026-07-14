@@ -1,0 +1,162 @@
+target:
+  sheet_name: "Food Waste"
+  header_row: 1
+  data_start_row: 2
+  period_column: "A"
+  total_column_header: "Total (kg)"
+  yearly_total_column_header: "Yearly Total (kg)"
+
+defaults:
+  parser_type: bordered_table
+
+  table_settings:
+    vertical_strategy: lines
+    horizontal_strategy: lines
+    intersection_tolerance: 5
+    snap_tolerance: 3
+    join_tolerance: 3
+
+  columns:
+    month: 0
+    collection_days: 1
+    daily_average: 2
+    total_amount: 3
+
+locations:
+  hkust_lg1_maxims:
+    display_name: "香港科技大學 - LG1 美心"
+    target_header: "LG1 Canteen and China Garden"
+
+    identification:
+      required_groups:
+        - ["香港科技大學", "香港科技大学"]
+        - ["LG1 美心", "LG 1 美心"]
+
+    aliases:
+      - "香港科技大學 - LG1 美心"
+      - "LG1 美心"
+      - "LG 1 美心"
+
+  hkust_lg7_parkshop:
+    display_name: "香港科技大學 - LG 7 百佳"
+    target_header: "LG7 Canteen + McDonald's"
+
+    identification:
+      required_groups:
+        - ["香港科技大學", "香港科技大学"]
+        - ["LG 7 百佳", "LG7 百佳"]
+
+    aliases:
+      - "香港科技大學 - LG 7 百佳"
+      - "LG 7 百佳"
+      - "LG7 百佳"
+
+  hkust_lg7:
+    display_name: "香港科技大學 - LG 7"
+    target_header: "LG7 Fusion"
+
+    identification:
+      required_groups:
+        - ["香港科技大學", "香港科技大学"]
+        - ["LG 7", "LG7"]
+      excluded_terms:
+        - "百佳"
+
+    aliases:
+      - "香港科技大學 - LG 7"
+      - "LG 7"
+      - "LG7"
+
+  hkust_lift_25:
+    display_name: "香港科技大學 - Lift 25"
+    target_header: "Courtyard (Lift 25)"
+
+    identification:
+      required_groups:
+        - ["香港科技大學", "香港科技大学"]
+        - ["Lift 25", "Lift25"]
+
+    aliases:
+      - "香港科技大學 - Lift 25"
+      - "Lift 25"
+      - "Lift25"
+
+  hkust_tower_c:
+    display_name: "香港科技大學 - Tower C"
+    target_header: "UC Bistro (Tower C)"
+
+    identification:
+      required_groups:
+        - ["香港科技大學", "香港科技大学"]
+        - ["Tower C", "TowerC"]
+
+    aliases:
+      - "香港科技大學 - Tower C"
+      - "Tower C"
+      - "TowerC"
+
+  hkust_lee_shau_kee_business_building:
+    display_name: "香港科技大學 - 李兆基商學大樓"
+    target_header: "LSK Campus"
+
+    identification:
+      required_groups:
+        - ["香港科技大學", "香港科技大学"]
+        - ["李兆基商學大樓", "李兆基商学大楼"]
+
+    aliases:
+      - "香港科技大學 - 李兆基商學大樓"
+      - "李兆基商學大樓"
+
+  hkust_ug6_seafront:
+    display_name: "香港科技大學 - UG 6 海濱"
+    target_header: "UG Halls + Seafront Cafeteria"
+
+    identification:
+      required_groups:
+        - ["香港科技大學", "香港科技大学"]
+        - ["UG 6 海濱", "UG6 海濱", "海濱", "海滨"]
+
+    aliases:
+      - "香港科技大學 - UG 6 海濱"
+      - "UG 6 海濱"
+      - "UG6 海濱"
+
+  hkust_ug_hall_1:
+    display_name: "香港科技大學 - UG Hall 1"
+    target_header: "UG Halls + Seafront Cafeteria"
+
+    identification:
+      required_groups:
+        - ["香港科技大學", "香港科技大学"]
+        - ["UG Hall 1", "UGHall 1"]
+
+    aliases:
+      - "香港科技大學 - UG Hall 1"
+      - "UG Hall 1"
+
+  hkust_conference_lodge:
+    display_name: "香港科技大學 - 李達三葉耀珍伉儷李本俊會議大樓"
+    target_header: "Conference Lodge"
+
+    identification:
+      required_groups:
+        - ["香港科技大學", "香港科技大学"]
+        - ["李達三葉耀珍伉儷李本俊會議大樓", "会议大楼"]
+
+    aliases:
+      - "香港科技大學 - 李達三葉耀珍伉儷李本俊會議大樓"
+      - "李達三葉耀珍伉儷李本俊會議大樓"
+
+  hkust_staff_quarters:
+    display_name: "香港科技大學 - 教職員宿舍"
+    target_header: "Staff Quarters (All)"
+
+    identification:
+      required_groups:
+        - ["香港科技大學", "香港科技大学"]
+        - ["教職員宿舍", "教职员宿舍"]
+
+    aliases:
+      - "香港科技大學 - 教職員宿舍"
+      - "教職員宿舍"

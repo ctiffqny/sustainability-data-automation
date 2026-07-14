@@ -13,6 +13,11 @@ from backend.processors.recyclable_wastes_processor import (
     apply_recyclable_wastes_transfer,
 )
 
+from backend.processors.food_waste_processor import (
+    preview_food_waste_transfer,
+    apply_food_waste_transfer,
+)
+
 BASE_DIR = Path(__file__).resolve().parents[1]
 CONFIG_DIR = BASE_DIR / "config"
 TEMP_DIR = BASE_DIR / "temp"
@@ -46,103 +51,187 @@ def save_upload(upload_file):
     return file_path
 
 
-def build_preview_response(category, source_file, target_file):
+def build_preview_response(
+    category,
+    source_file=None,
+    target_file=None,
+    source_files=None,
+    month=None,
+):
     category = category.lower().strip()
     run_id = str(uuid.uuid4())
 
-    config, config_path = load_category_config(category)
+    config, config_path = load_category_config(
+        category
+    )
 
-    source_path = save_upload(source_file)
     target_path = save_upload(target_file)
 
-    config["source_file"] = str(source_path)
     config["target_file"] = str(target_path)
+    config["config_path"] = str(config_path)
 
-    config["source_output_file"] = str(
-        OUTPUT_DIR / f"{run_id}_{category}_source_highlighted.xlsx"
-    )
     config["target_output_file"] = str(
-        OUTPUT_DIR / f"{run_id}_{category}_preview_output.xlsx"
+        OUTPUT_DIR
+        / f"{run_id}_{category}_preview_output.xlsx"
     )
 
-    if category == "electricity":
-        result = preview_electricity_transfer(config)
+    if category == "food_waste":
+        if not source_files:
+            return {
+                "status": "error",
+                "message": (
+                    "At least one food-waste PDF "
+                    "must be uploaded."
+                ),
+            }
+        
+        print(f"Received {len(source_files)} food-waste PDFs")
 
-    elif category == "recyclable_wastes":
-        result = preview_recyclable_wastes_transfer(config)
+        source_paths = save_uploads(source_files)
+
+        print("Saved uploaded PDFs:")
+        for path in source_paths:
+            print(path)
+
+        config["source_files"] = [
+            str(path)
+            for path in source_paths
+        ]
+        config["month"] = month
+
+        print("Starting food-waste preview")
+
+        result = preview_food_waste_transfer(config)
+        print("Food-waste preview completed")
+
+        result["source_paths"] = [
+            str(path)
+            for path in source_paths
+        ]
 
     else:
-        return {
-            "status": "error",
-            "message": f"Unsupported category: {category}",
-        }
+        source_path = save_upload(source_file)
+
+        config["source_file"] = str(source_path)
+
+        config["source_output_file"] = str(
+            OUTPUT_DIR
+            / (
+                f"{run_id}_{category}"
+                "_source_highlighted.xlsx"
+            )
+        )
+
+        if category == "electricity":
+            result = preview_electricity_transfer(
+                config
+            )
+
+        elif category == "recyclable_wastes":
+            result = (
+                preview_recyclable_wastes_transfer(
+                    config
+                )
+            )
+
+        else:
+            return {
+                "status": "error",
+                "message": (
+                    f"Unsupported category: {category}"
+                ),
+            }
+
+        result["source_path"] = str(
+            source_path
+        )
 
     result["status"] = "success"
     result["category"] = category
-    result["source_path"] = str(source_path)
     result["target_path"] = str(target_path)
     result["config_used"] = config_path.name
     result["run_id"] = run_id
 
     return result
 
+
 def build_apply_response(
     category,
-    source_path,
     target_path,
+    source_path=None,
+    source_paths=None,
+    month=None,
 ):
     category = category.lower().strip()
-
     run_id = str(uuid.uuid4())
 
-    config, config_path = load_category_config(category)
+    config, config_path = load_category_config(
+        category
+    )
 
-    config["source_file"] = source_path
-
-    # Duplicate starts from the uploaded target copy.
     config["target_file"] = target_path
+    config["config_path"] = str(config_path)
 
     config["target_output_file"] = str(
         OUTPUT_DIR
         / f"{run_id}_{category}_applied_output.xlsx"
     )
 
-    config["source_output_file"] = str(
-        OUTPUT_DIR
-        / f"{run_id}_{category}_source_highlighted.xlsx"
-    )
+    if category == "food_waste":
+        config["source_files"] = source_paths or []
+        config["month"] = month
 
-    if category == "electricity":
-        result = apply_electricity_transfer(
-            config,
+        result = apply_food_waste_transfer(
+            config
         )
 
-    elif category == "recyclable_wastes":
-        result = apply_recyclable_wastes_transfer(
-            config,
-        )
-    
     else:
-        return {
-            "status": "error",
-            "message": (
-                f"Unsupported category: {category}"
-            ),
-        }
+        config["source_file"] = source_path
+
+        config["source_output_file"] = str(
+            OUTPUT_DIR
+            / (
+                f"{run_id}_{category}"
+                "_source_highlighted.xlsx"
+            )
+        )
+
+        if category == "electricity":
+            result = apply_electricity_transfer(
+                config
+            )
+
+        elif category == "recyclable_wastes":
+            result = (
+                apply_recyclable_wastes_transfer(
+                    config
+                )
+            )
+
+        else:
+            return {
+                "status": "error",
+                "message": (
+                    f"Unsupported category: {category}"
+                ),
+            }
 
     result["status"] = "success"
     result["category"] = category
     result["config_used"] = config_path.name
     result["run_id"] = run_id
-    result["source_path"] = source_path
-    result["target_path"] = config["target_file"]
-    result["output_file"] = config["target_output_file"]
-    result["highlighted_source_file"] = (
-        config["source_output_file"]
+    result["target_path"] = target_path
+    result["output_file"] = (
+        config["target_output_file"]
     )
-
     result["message"] = (
         "A duplicate workbook was created successfully."
     )
 
     return result
+
+def save_uploads(upload_files):
+    return [
+        save_upload(upload_file)
+        for upload_file in upload_files
+    ]

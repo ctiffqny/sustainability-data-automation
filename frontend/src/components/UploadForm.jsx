@@ -1,26 +1,66 @@
 import { useState } from "react";
 import axios from "axios";
 
+const EXCEL_CATEGORIES = [
+  "electricity",
+  "recyclable_wastes",
+];
+
 export default function UploadForm({ onPreview }) {
   const [category, setCategory] = useState("electricity");
+
   const [sourceFile, setSourceFile] = useState(null);
   const [targetFile, setTargetFile] = useState(null);
+
+  const [pdfFiles, setPdfFiles] = useState([]);
+  const [month, setMonth] = useState("Apr-26");
+
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  async function handlePreview(event) {
-  event.preventDefault();
+  const isFoodWaste = category === "food_waste";
+  const isExcelCategory =
+    EXCEL_CATEGORIES.includes(category);
 
-  if (!(sourceFile instanceof File) || !(targetFile instanceof File)) {
-    setErrorMessage("Please select both workbooks again.");
-    return;
+  function resetSelectedFiles(nextCategory) {
+    setSourceFile(null);
+    setTargetFile(null);
+    setPdfFiles([]);
+    setErrorMessage("");
+    onPreview(null);
+
+    setCategory(nextCategory);
   }
 
-  setLoading(true);
-  setErrorMessage("");
-  onPreview(null);
+  function validateExcelUpload() {
+    if (!(sourceFile instanceof File)) {
+      return "Please select a source workbook.";
+    }
 
-  try {
+    if (!(targetFile instanceof File)) {
+      return "Please select a target workbook.";
+    }
+
+    return null;
+  }
+
+  function validateFoodWasteUpload() {
+    if (!month.trim()) {
+      return "Please enter a month such as Apr-26.";
+    }
+
+    if (pdfFiles.length === 0) {
+      return "Please select at least one PDF.";
+    }
+
+    if (!(targetFile instanceof File)) {
+      return "Please select the target workbook.";
+    }
+
+    return null;
+  }
+
+  async function submitExcelPreview() {
     const formData = new FormData();
 
     formData.append("category", category);
@@ -37,52 +77,98 @@ export default function UploadForm({ onPreview }) {
       targetFile.name
     );
 
-    console.log({
-      sourceFile,
-      sourceIsFile: sourceFile instanceof File,
-      targetFile,
-      targetIsFile: targetFile instanceof File,
+    return axios.post(
+      "http://127.0.0.1:8000/preview",
+      formData
+    );
+  }
+
+  async function submitFoodWastePDFs() {
+    const formData = new FormData();
+
+    formData.append("category", "food_waste");
+    formData.append("month", month.trim());
+
+    pdfFiles.forEach((file) => {
+      formData.append(
+        "source_files",
+        file,
+        file.name
+      );
     });
+
+    formData.append(
+      "target_file",
+      targetFile,
+      targetFile.name
+    );
 
     const response = await axios.post(
       "http://127.0.0.1:8000/preview",
       formData
     );
+  }
 
-    if (response.data?.status === "error") {
-      setErrorMessage(
-        response.data.message ?? "Preview failed."
-      );
+  async function handlePreview(event) {
+    event.preventDefault();
+
+    const validationError = isFoodWaste
+      ? validateFoodWasteUpload()
+      : validateExcelUpload();
+
+    if (validationError) {
+      setErrorMessage(validationError);
       return;
     }
 
-    onPreview(response.data);
+    setLoading(true);
+    setErrorMessage("");
+    onPreview(null);
+
+    try {
+      const response = isFoodWaste
+        ? await submitFoodWastePDFs()
+        : await submitExcelPreview();
+
+      if (response.data?.status === "error") {
+        setErrorMessage(
+          response.data.message ??
+            "Processing failed."
+        );
+        return;
+      }
+
+      onPreview({
+        ...response.data,
+        category,
+      });
   } catch (error) {
-    console.error("Preview failed:", error);
+    console.error("Processing failed:", error);
 
-    const detail = error.response?.data?.detail;
+    if (error.code === "ECONNABORTED") {
+      setErrorMessage(
+        "The request timed out. Check the backend terminal."
+      );
+    } else if (error.response?.data?.detail) {
+      const detail = error.response.data.detail;
 
-    if (detail) {
       setErrorMessage(
         typeof detail === "string"
           ? detail
-          : detail
-              .map((item) => item.msg)
-              .join(", ")
+          : JSON.stringify(detail)
       );
     } else if (error.response) {
       setErrorMessage(
-        `Backend error: ${error.response.status}`
+        `Backend error ${error.response.status}`
       );
     } else {
       setErrorMessage(
-        "Could not connect to the backend."
+        `Could not connect to the backend: ${error.message}`
       );
     }
   } finally {
     setLoading(false);
   }
-}
 
   return (
     <form
@@ -92,13 +178,17 @@ export default function UploadForm({ onPreview }) {
       <h2>Upload Files</h2>
 
       <div className="form-field">
-        <label htmlFor="category">Category</label>
+        <label htmlFor="category">
+          Category
+        </label>
 
         <select
           id="category"
           value={category}
           onChange={(event) =>
-            setCategory(event.target.value)
+            resetSelectedFiles(
+              event.target.value
+            )
           }
         >
           <option value="electricity">
@@ -108,46 +198,130 @@ export default function UploadForm({ onPreview }) {
           <option value="recyclable_wastes">
             Recyclable Wastes
           </option>
+
+          <option value="food_waste">
+            Food Waste PDFs
+          </option>
         </select>
       </div>
 
-      <div className="form-field">
-        <label htmlFor="source-file">
-          Source Workbook
-        </label>
+      {isExcelCategory && (
+        <>
+          <div className="form-field">
+            <label htmlFor="source-file">
+              Source Workbook
+            </label>
 
-        <input
-          id="source-file"
-          type="file"
-          accept=".xlsx,.xlsm"
-          onChange={(event) =>
-            setSourceFile(event.target.files?.[0] ?? null)
-          }
-        />
+            <input
+              id="source-file"
+              type="file"
+              accept=".xlsx,.xlsm"
+              onChange={(event) =>
+                setSourceFile(
+                  event.target.files?.[0] ??
+                    null
+                )
+              }
+            />
 
-        {sourceFile && (
-          <small>{sourceFile.name}</small>
-        )}
-      </div>
+            {sourceFile && (
+              <small>
+                {sourceFile.name}
+              </small>
+            )}
+          </div>
 
-      <div className="form-field">
-        <label htmlFor="target-file">
-          Target Workbook
-        </label>
+          <div className="form-field">
+            <label htmlFor="target-file">
+              Target Workbook
+            </label>
 
-        <input
-          id="target-file"
-          type="file"
-          accept=".xlsx,.xlsm"
-          onChange={(event) =>
-            setTargetFile(event.target.files?.[0] ?? null)
-          }
-        />
+            <input
+              id="target-file"
+              type="file"
+              accept=".xlsx,.xlsm"
+              onChange={(event) =>
+                setTargetFile(
+                  event.target.files?.[0] ??
+                    null
+                )
+              }
+            />
 
-        {targetFile && (
-          <small>{targetFile.name}</small>
-        )}
-      </div>
+            {targetFile && (
+              <small>
+                {targetFile.name}
+              </small>
+            )}
+          </div>
+        </>
+      )}
+
+      {isFoodWaste && (
+  <>
+    <div className="form-field">
+      <label htmlFor="food-waste-month">
+        Collection Month
+      </label>
+
+      <input
+        id="food-waste-month"
+        type="text"
+        value={month}
+        placeholder="Apr-26"
+        onChange={(event) =>
+          setMonth(event.target.value)
+        }
+      />
+    </div>
+
+    <div className="form-field">
+      <label htmlFor="food-waste-pdfs">
+        Source Food Waste PDFs
+      </label>
+
+      <input
+        id="food-waste-pdfs"
+        type="file"
+        accept=".pdf,application/pdf"
+        multiple
+        onChange={(event) =>
+          setPdfFiles(
+            Array.from(
+              event.target.files ?? []
+            )
+          )
+        }
+      />
+
+      <small>
+        {pdfFiles.length} PDF(s) selected
+      </small>
+    </div>
+
+    <div className="form-field">
+      <label htmlFor="food-waste-target">
+        Target Workbook
+      </label>
+
+      <input
+        id="food-waste-target"
+        type="file"
+        accept=".xlsx,.xlsm"
+        onChange={(event) =>
+          setTargetFile(
+            event.target.files?.[0] ??
+              null
+          )
+        }
+      />
+
+      {targetFile && (
+        <small>{targetFile.name}</small>
+      )}
+    </div>
+  </>
+)}
 
       {errorMessage && (
         <div className="error-message">
@@ -160,9 +334,13 @@ export default function UploadForm({ onPreview }) {
         disabled={loading}
       >
         {loading
-          ? "Generating preview..."
-          : "Preview Changes"}
+          ? isFoodWaste
+            ? "Processing PDFs..."
+            : "Generating preview..."
+          : isFoodWaste
+            ? "Process PDFs"
+            : "Preview Changes"}
       </button>
     </form>
   );
-}
+}}
