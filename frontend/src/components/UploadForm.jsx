@@ -13,7 +13,13 @@ export default function UploadForm({ onPreview }) {
   const [targetFile, setTargetFile] = useState(null);
 
   const [pdfFiles, setPdfFiles] = useState([]);
-  const [month, setMonth] = useState("Apr-26");
+  const currentDate = new Date();
+
+  const defaultMonth = `${currentDate.toLocaleString("en-US", {
+    month: "short",
+  })}-${String(currentDate.getFullYear()).slice(-2)}`;
+
+  const [month, setMonth] = useState(defaultMonth);
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -169,7 +175,7 @@ export default function UploadForm({ onPreview }) {
   } finally {
     setLoading(false);
   }
-}
+  }
 
   return (
     <form
@@ -269,7 +275,7 @@ export default function UploadForm({ onPreview }) {
         id="food-waste-month"
         type="text"
         value={month}
-        placeholder="Apr-26"
+        placeholder="e.g. Apr-26"
         onChange={(event) =>
           setMonth(event.target.value)
         }

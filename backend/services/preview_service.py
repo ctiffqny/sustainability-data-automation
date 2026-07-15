@@ -97,7 +97,17 @@ def build_preview_response(
             str(path)
             for path in source_paths
         ]
-        config["month"] = month
+
+        if not month or not month.strip():
+            return {
+                "status": "error",
+                "message": (
+                    "A food-waste reporting month is required "
+                    "(for example Apr-26)."
+                ),
+            }
+
+        config["month"] = month.strip()
 
         print("Starting food-waste preview")
 
@@ -108,6 +118,9 @@ def build_preview_response(
             str(path)
             for path in source_paths
         ]
+        # Explicitly preserve the processor-normalized month for the
+        # frontend Apply request.
+        result["month"] = result.get("month", config["month"])
 
     else:
         source_path = save_upload(source_file)

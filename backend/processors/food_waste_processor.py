@@ -394,6 +394,10 @@ def _transfer_food_waste(
     workbook.save(output_path)
 
     return {
+        # Keep the normalized reporting month in the preview response.
+        # ApplyPanel sends this value back to /apply; without it the apply
+        # request receives an empty month and PDF extraction fails.
+        "month": month,
         "updated_rows": [
             {
                 "period": month,
