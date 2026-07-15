@@ -23,10 +23,20 @@ export default function PreviewTable({
     newColumns.map(normalizeColumn)
     );
 
+  const hiddenFoodWasteColumns = new Set([
+    "total (kg)",
+    "yearly total (kg)",
+    "yearly total waste generated",
+  ]);
+
   const columns = Array.from(
     new Set(
       rows.flatMap((row) => Object.keys(row.values ?? {}))
     )
+  ).filter(
+    (column) =>
+      category !== "food_waste" ||
+      !hiddenFoodWasteColumns.has(normalizeColumn(column))
   );
 
   const inconsistencyCells = new Set(
@@ -205,11 +215,19 @@ export default function PreviewTable({
             changes are applied.
 
             {category === "recyclable_wastes" && (
-                <>
+              <>
                 <br />
-                <strong>Note:</strong> Values should have been converted from tonnes to kg.
-                </>
-            ) }
+                <strong>Note:</strong> Values are converted from tonnes to kg.
+              </>
+            )}
+
+            {category === "food_waste" && (
+              <>
+                <br />
+                <strong>Note:</strong> The columns follow the target worksheet order.
+                Monthly and yearly totals are shown under Processed Data.
+              </>
+            )}
           </p>
         </div>
 

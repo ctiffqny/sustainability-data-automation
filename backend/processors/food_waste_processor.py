@@ -14,6 +14,7 @@ from openpyxl.styles import PatternFill
 
 from backend.core.pdf_config_utils import PDFConfigLoader
 from backend.processors.pdf_processor import PDFProcessor
+from backend.processors.calculation_processor import data_processing
 
 
 PREVIEW_FILL = PatternFill(
@@ -278,7 +279,7 @@ def _transfer_food_waste(
         period_column_letter
     )
 
-    month, totals_by_header, processed_rows = (
+    month, totals_by_header, extraction_rows = (
         _extract_pdf_values(config)
     )
 
@@ -321,21 +322,25 @@ def _transfer_food_waste(
 
     updated_values: dict[str, dict[str, Any]] = {}
 
-    for target_header, kilograms in totals_by_header.items():
-        normalized_header = _normalize_header(
-            target_header
-        )
+    # Walk the target worksheet from left to right. This makes the
+    # frontend preview follow the exact physical column sequence of
+    # the uploaded target workbook, regardless of PDF upload order.
+    totals_by_normalized_header = {
+        _normalize_header(header): kilograms
+        for header, kilograms in totals_by_header.items()
+    }
 
-        column_number = header_columns.get(
-            normalized_header
-        )
+    for column_number in range(1, worksheet.max_column + 1):
+        target_header = worksheet.cell(
+            row=header_row,
+            column=column_number,
+        ).value
+        normalized_header = _normalize_header(target_header)
 
-        if column_number is None:
-            raise FoodWasteTransferError(
-                f"Target column '{target_header}' "
-                "was not found in the workbook."
-            )
+        if normalized_header not in totals_by_normalized_header:
+            continue
 
+        kilograms = totals_by_normalized_header[normalized_header]
         cell = worksheet.cell(
             row=target_row,
             column=column_number,
@@ -343,13 +348,12 @@ def _transfer_food_waste(
 
         old_value = cell.value
         new_value = float(kilograms)
-
         cell.value = new_value
 
         if preview:
             cell.fill = PREVIEW_FILL
 
-        updated_values[target_header] = {
+        updated_values[str(target_header)] = {
             "cell": cell.coordinate,
             "old_value": old_value,
             "new_value": new_value,
@@ -361,59 +365,31 @@ def _transfer_food_waste(
             ),
         }
 
-    total_header = target_config.get(
-        "total_column_header",
-        "Total (kg)",
+    missing_headers = [
+        header
+        for header in totals_by_header
+        if _normalize_header(header) not in header_columns
+    ]
+    if missing_headers:
+        raise FoodWasteTransferError(
+            "Target column(s) were not found in the workbook: "
+            + ", ".join(missing_headers)
+        )
+
+    # Calculated fields are intentionally excluded from updated_values,
+    # so Total (kg) and Yearly Total (kg) do not appear in the Excel
+    # Layout Preview. They are returned separately as processed_rows.
+    calculation_config = dict(config)
+    calculation_config["category"] = "food_waste"
+    calculation_config["calculation_months"] = {
+        "mode": "selected",
+        "months": [month],
+    }
+
+    processed_rows = data_processing(
+        workbook,
+        calculation_config,
     )
-    total_column = header_columns.get(
-        _normalize_header(total_header)
-    )
-
-    if total_column is not None:
-        first_location_column = min(
-            header_columns[
-                _normalize_header(header)
-            ]
-            for header in totals_by_header
-        )
-        last_location_column = max(
-            header_columns[
-                _normalize_header(header)
-            ]
-            for header in totals_by_header
-        )
-
-        total_cell = worksheet.cell(
-            row=target_row,
-            column=total_column,
-        )
-
-        start_letter = (
-            openpyxl.utils.get_column_letter(
-                first_location_column
-            )
-        )
-        end_letter = (
-            openpyxl.utils.get_column_letter(
-                last_location_column
-            )
-        )
-
-        total_cell.value = (
-            f"=SUM({start_letter}{target_row}:"
-            f"{end_letter}{target_row})"
-        )
-
-        if preview:
-            total_cell.fill = PREVIEW_FILL
-
-        updated_values[total_header] = {
-            "cell": total_cell.coordinate,
-            "old_value": None,
-            "new_value": total_cell.value,
-            "final_value": total_cell.value,
-            "status": "formula_updated",
-        }
 
     workbook.save(output_path)
 
@@ -432,6 +408,7 @@ def _transfer_food_waste(
             }
         ],
         "processed_rows": processed_rows,
+        "extraction_rows": extraction_rows,
         "inconsistencies": [],
         "new_columns": [],
         "skipped_columns": [],

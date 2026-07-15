@@ -18,9 +18,15 @@ export default function ApplyPanel({ previewResult }) {
   }, [previewResult?.run_id]);
 
   async function handleApply() {
+    const isFoodWaste = previewResult?.category === "food_waste";
+    const hasSource = isFoodWaste
+      ? Array.isArray(previewResult?.source_paths) &&
+        previewResult.source_paths.length > 0
+      : Boolean(previewResult?.source_path);
+
     if (
       !previewResult?.category ||
-      !previewResult?.source_path ||
+      !hasSource ||
       !previewResult?.target_path
     ) {
       setErrorMessage(
@@ -37,8 +43,16 @@ export default function ApplyPanel({ previewResult }) {
       const formData = new FormData();
 
       formData.append("category", previewResult.category);
-      formData.append("source_path", previewResult.source_path);
       formData.append("target_path", previewResult.target_path);
+
+      if (previewResult.category === "food_waste") {
+        previewResult.source_paths.forEach((path) => {
+          formData.append("source_paths", path);
+        });
+        formData.append("month", previewResult.month ?? "");
+      } else {
+        formData.append("source_path", previewResult.source_path);
+      }
 
       const response = await axios.post(
         `${API_BASE_URL}/apply`,

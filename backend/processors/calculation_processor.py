@@ -136,6 +136,30 @@ def is_june(month):
 
 
 def should_skip_calculation(config, calculation, month):
+    """
+    Return True when a configured calculation should not run for month.
+
+    Preferred generic rule:
+      run_months: ["Jun"]
+
+    The older recyclable-waste yearly-total rule is retained for
+    backward compatibility with existing YAML files.
+    """
+    configured_months = calculation.get("run_months")
+
+    if configured_months:
+        normalized_month = normalize_period(month)
+        month_prefix = normalized_month.split("-", 1)[0]
+
+        allowed = {
+            normalize_period(f"{value}-00").split("-", 1)[0]
+            if "-" not in str(value)
+            else normalize_period(value).split("-", 1)[0]
+            for value in configured_months
+        }
+
+        return month_prefix not in allowed
+
     category = normalize(config.get("category", ""))
     output_column = normalize(calculation.get("output_column", ""))
 
@@ -147,7 +171,6 @@ def should_skip_calculation(config, calculation, month):
         return True
 
     return False
-    
 
 def data_processing(target_wb, config):
 
@@ -259,6 +282,7 @@ def data_processing(target_wb, config):
 
     processed_updates_by_month = {}
     skipped_non_numeric_by_month = {}
+    processed_rows_by_month = {}
 
     for month in months:
         source_row = find_calculation_period_row(source_ws, month)
@@ -364,6 +388,23 @@ def data_processing(target_wb, config):
                 cell.number_format = "0%"
             else:
                 cell.number_format = "#,##0"
+
+            normalized_month = normalize_period(month)
+            processed_row = processed_rows_by_month.setdefault(
+                normalized_month,
+                {
+                    "period": month,
+                    "target_row": target_row,
+                    "values": {},
+                },
+            )
+            processed_row["values"][output_column] = {
+                "cell": cell.coordinate,
+                "old_value": None,
+                "new_value": result,
+                "final_value": result,
+                "status": "calculated",
+            }
             
     print("\nProcessed data calculations:")
 
@@ -412,3 +453,5 @@ def data_processing(target_wb, config):
             print(f"- {month} | {', '.join(sorted(columns))}")
     else:
         print("- none")
+
+    return list(processed_rows_by_month.values())

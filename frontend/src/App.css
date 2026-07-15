@@ -228,16 +228,6 @@ select {
   border-bottom: 0;
 }
 
-/* Remove old pseudo-element dividers */
-
-.summary-item::before,
-.summary-item::after,
-.summary-grid > div::before,
-.summary-grid > div::after {
-  display: none;
-  content: none;
-}
-
 /* Summary labels */
 
 .summary-label {
@@ -463,7 +453,6 @@ select {
 .apply-panel {
   width: min(100%, 1000px);
   background: transparent;
-  margin: 20px;
   box-shadow: none;
   border: none;
   padding: 0;
@@ -741,36 +730,8 @@ select {
   background: #ffffff;
 }
 
-/* Mobile apply layout */
-
-@media (max-width: 600px) {
-  .apply-panel {
-    padding: 22px 18px;
-    border-radius: 10px;
-  }
-
-  .output-mode-card {
-    padding: 16px;
-  }
-
-  .output-mode-content strong {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 7px;
-  }
-
-  .apply-button {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .download-actions {
-    flex-direction: column;
-  }
-
-  .download-button {
-    width: 100%;
-  }
+.processed-food-waste-table-wrapper .excel-preview-table {
+  min-width: 0;
 }
 
 /* -------------------------------------------------- */
@@ -902,10 +863,32 @@ select {
     flex-direction: column;
     gap: 8px;
   }
-}
 
-@media (max-width: 420px) {
-  .upload-form button {
+  .apply-panel {
+    padding: 22px 18px;
+    border-radius: 10px;
+  }
+
+  .output-mode-card {
+    padding: 16px;
+  }
+
+  .output-mode-content strong {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .apply-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .download-actions {
+    flex-direction: column;
+  }
+
+  .download-button {
     width: 100%;
   }
 }

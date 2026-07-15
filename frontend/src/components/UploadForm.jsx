@@ -103,7 +103,7 @@ export default function UploadForm({ onPreview }) {
       targetFile.name
     );
 
-    const response = await axios.post(
+    return axios.post(
       "http://127.0.0.1:8000/preview",
       formData
     );
@@ -169,6 +169,7 @@ export default function UploadForm({ onPreview }) {
   } finally {
     setLoading(false);
   }
+}
 
   return (
     <form
@@ -343,4 +344,4 @@ export default function UploadForm({ onPreview }) {
       </button>
     </form>
   );
-}}
+}

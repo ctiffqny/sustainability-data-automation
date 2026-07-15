@@ -1,10 +1,8 @@
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from backend.services.preview_service import build_preview_response, build_apply_response
-from backend.services.preview_service import build_preview_response
 from fastapi.responses import FileResponse
 from pathlib import Path
-from backend.api.pdf_routes import router as pdf_router
 
 app = FastAPI(title="Sustainability Data Automation API")
 
@@ -18,8 +16,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-app.include_router(pdf_router)
 
 @app.get("/")
 def root():
@@ -46,14 +42,18 @@ def preview(
 @app.post("/apply")
 async def apply(
     category: str = Form(...),
-    source_path: str = Form(...),
     target_path: str = Form(...),
+    source_path: str | None = Form(None),
+    source_paths: list[str] | None = Form(None),
+    month: str | None = Form(None),
 ):
     try:
         return build_apply_response(
             category=category,
             source_path=source_path,
+            source_paths=source_paths,
             target_path=target_path,
+            month=month,
         )
     except FileNotFoundError as error:
         return {

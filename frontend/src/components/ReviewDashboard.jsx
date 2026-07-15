@@ -169,15 +169,20 @@ export default function ReviewDashboard({ previewResult }) {
       {processedRows.length > 0 && (
         <ProcessedDataTable
             rows={processedRows}
+            category={category}
             title={
-            category === "recyclable_wastes"
+              category === "recyclable_wastes"
                 ? "Processed Solid Waste Data"
-                : "Processed Data"
+                : category === "food_waste"
+                  ? "Processed Food Waste Data"
+                  : "Processed Data"
             }
             description={
-            category === "recyclable_wastes"
-                ? "These values were calculated by the backend using the rules configured in the recyclable waste YAML file. Yearly Total Waste Generated only applies every June."
-                : "These values were calculated by the backend."
+              category === "recyclable_wastes"
+                ? "These values were calculated by the backend using the rules configured in the recyclable waste YAML file. Yearly Total Waste Generated is calculated only every June."
+                : category === "food_waste"
+                  ? "Total (kg) is calculated from the location columns for the selected month. Yearly Total (kg) is a rolling 12-month total and is calculated only every June."
+                  : "These values were calculated by the backend."
             }
         />
         )}
