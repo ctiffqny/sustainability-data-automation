@@ -212,7 +212,16 @@ def _extract_pdf_values(
         tonnes = Decimal(str(tonnes_text))
         kilograms = tonnes * Decimal("1000")
 
-        totals_by_header[target_header] += kilograms
+        # Staff Quarters is intentionally sourced only from the smart-bin
+        # workbook. Ignore its PDF to avoid counting the same waste twice.
+        is_staff_quarters_pdf = (
+            record.get("location_key") == "hkust_staff_quarters"
+            or _normalize_header(target_header)
+            == _normalize_header("Staff Quarters (All)")
+        )
+
+        if not is_staff_quarters_pdf:
+            totals_by_header[target_header] += kilograms
 
         processed_rows.append(
             {
@@ -223,6 +232,17 @@ def _extract_pdf_values(
                 "month": month,
                 "total_amount_tonnes": str(tonnes),
                 "total_amount_kg": float(kilograms),
+                "status": (
+                    "ignored_double_counting"
+                    if is_staff_quarters_pdf
+                    else "included"
+                ),
+                "note": (
+                    "Staff Quarters PDF was disregarded to avoid double counting; "
+                    "the Staff Quarters value comes only from the smart waste-bin workbook."
+                    if is_staff_quarters_pdf
+                    else None
+                ),
             }
         )
 
@@ -311,17 +331,19 @@ def _extract_smart_bin_values(
         )
         is_staff = bool(re.search(r"staff\s+quarter(?:s)?", normalized_kiosk))
 
+        # Every smart-bin food-waste record is deducted from the selected
+        # PDF collection point, including PRQS.
+        route_deduction += kilograms
+
         target_header = None
         if is_student:
             ug_total += kilograms
             target_header = "UG Halls + Seafront Cafeteria"
-        elif is_staff and not is_prqs:
+        elif is_staff or is_prqs:
+            # Staff Quarters now comes exclusively from the smart-bin report,
+            # including PRQS rows.
             staff_total += kilograms
             target_header = "Staff Quarters (All)"
-
-        # All smart-bin food waste, including PRQS, was delivered to the
-        # selected PDF collection point and must be deducted from it.
-        route_deduction += kilograms
 
         rows.append({
             "source_file": str(source_path),
@@ -543,15 +565,6 @@ def _transfer_food_waste(
         workbook,
         calculation_config,
     )
-
-    # Preview keeps the full workbook because the calculation processor may
-    # need supporting sheets. The applied download contains only the food-waste
-    # worksheet requested by the user.
-    if not preview:
-        for other_sheet in list(workbook.worksheets):
-            if other_sheet.title != worksheet.title:
-                workbook.remove(other_sheet)
-        workbook.active = 0
 
     workbook.save(output_path)
 

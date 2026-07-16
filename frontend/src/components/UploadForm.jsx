@@ -306,6 +306,9 @@ export default function UploadForm({ onPreview }) {
       <label htmlFor="food-waste-month">
         Collection Month
       </label>
+      <small className="warning-text">
+        This program only works for data from Apr-26 onwards.
+      </small>
 
       <input
         id="food-waste-month"
@@ -322,6 +325,9 @@ export default function UploadForm({ onPreview }) {
       <label htmlFor="food-waste">
         Source Food Waste
       </label>
+      <small className="warning-text">
+        A Staff Quarters PDF may be uploaded, but it will be disregarded to avoid double counting. Staff Quarters, including PRQS, is sourced only from the smart waste-bin workbook.
+      </small>
 
       <input
         id="food-waste"
@@ -379,7 +385,7 @@ export default function UploadForm({ onPreview }) {
       </select>
 
       <small>
-        Smart-bin waste will be deducted from this PDF collection point.
+        All smart-bin waste, including PRQS, will be deducted from this PDF collection point.
       </small>
     </div>
 
