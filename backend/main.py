@@ -28,6 +28,8 @@ def preview(
     target_file: UploadFile = File(...),
     source_file: UploadFile | None = File(None),
     source_files: list[UploadFile] | None = File(None),
+    smart_bin_file: UploadFile | None = File(None),
+    smart_bin_collection_point: str | None = Form(None),
     month: str | None = Form(None),
 ):
     return build_preview_response(
@@ -35,6 +37,8 @@ def preview(
         source_file=source_file,
         source_files=source_files,
         target_file=target_file,
+        smart_bin_file=smart_bin_file,
+        smart_bin_collection_point=smart_bin_collection_point,
         month=month,
     )
     
@@ -45,6 +49,8 @@ async def apply(
     target_path: str = Form(...),
     source_path: str | None = Form(None),
     source_paths: list[str] | None = Form(None),
+    smart_bin_path: str | None = Form(None),
+    smart_bin_collection_point: str | None = Form(None),
     month: str | None = Form(None),
 ):
     try:
@@ -53,6 +59,8 @@ async def apply(
             source_path=source_path,
             source_paths=source_paths,
             target_path=target_path,
+            smart_bin_path=smart_bin_path,
+            smart_bin_collection_point=smart_bin_collection_point,
             month=month,
         )
     except FileNotFoundError as error:

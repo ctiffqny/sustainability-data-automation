@@ -6,6 +6,19 @@ const EXCEL_CATEGORIES = [
   "recyclable_wastes",
 ];
 
+const FOOD_WASTE_COLLECTION_POINTS = [
+  ["hkust_lg1_maxims", "LG1 Canteen and China Garden"],
+  ["hkust_lg7_parkshop", "LG7 Canteen + McDonald's"],
+  ["hkust_lg7", "LG7 Fusion"],
+  ["hkust_lift_25", "Courtyard (Lift 25)"],
+  ["hkust_tower_c", "UC Bistro (Tower C)"],
+  ["hkust_lee_shau_kee_business_building", "LSK Campus"],
+  ["hkust_ug6_seafront", "UG 6 Seafront"],
+  ["hkust_ug_hall_1", "UG Hall 1"],
+  ["hkust_conference_lodge", "Conference Lodge"],
+  ["hkust_staff_quarters", "Staff Quarters"],
+];
+
 export default function UploadForm({ onPreview }) {
   const [category, setCategory] = useState("electricity");
 
@@ -13,6 +26,10 @@ export default function UploadForm({ onPreview }) {
   const [targetFile, setTargetFile] = useState(null);
 
   const [pdfFiles, setPdfFiles] = useState([]);
+  const [smartBinFile, setSmartBinFile] = useState(null);
+  const [smartBinCollectionPoint, setSmartBinCollectionPoint] = useState(
+    FOOD_WASTE_COLLECTION_POINTS[0][0]
+  );
   const currentDate = new Date();
 
   const defaultMonth = `${currentDate.toLocaleString("en-US", {
@@ -32,6 +49,8 @@ export default function UploadForm({ onPreview }) {
     setSourceFile(null);
     setTargetFile(null);
     setPdfFiles([]);
+    setSmartBinFile(null);
+    setSmartBinCollectionPoint(FOOD_WASTE_COLLECTION_POINTS[0][0]);
     setErrorMessage("");
     onPreview(null);
 
@@ -57,6 +76,14 @@ export default function UploadForm({ onPreview }) {
 
     if (pdfFiles.length === 0) {
       return "Please select at least one PDF.";
+    }
+
+    if (!(smartBinFile instanceof File)) {
+      return "Please select the smart waste-bin workbook.";
+    }
+
+    if (!smartBinCollectionPoint) {
+      return "Please choose the collection point that received the smart-bin waste.";
     }
 
     if (!(targetFile instanceof File)) {
@@ -94,6 +121,15 @@ export default function UploadForm({ onPreview }) {
 
     formData.append("category", "food_waste");
     formData.append("month", month.trim());
+    formData.append(
+      "smart_bin_collection_point",
+      smartBinCollectionPoint
+    );
+    formData.append(
+      "smart_bin_file",
+      smartBinFile,
+      smartBinFile.name
+    );
 
     pdfFiles.forEach((file) => {
       formData.append(
@@ -207,7 +243,7 @@ export default function UploadForm({ onPreview }) {
           </option>
 
           <option value="food_waste">
-            Food Waste PDFs
+            Food Waste
           </option>
         </select>
       </div>
@@ -283,12 +319,12 @@ export default function UploadForm({ onPreview }) {
     </div>
 
     <div className="form-field">
-      <label htmlFor="food-waste-pdfs">
-        Source Food Waste PDFs
+      <label htmlFor="food-waste">
+        Source Food Waste
       </label>
 
       <input
-        id="food-waste-pdfs"
+        id="food-waste"
         type="file"
         accept=".pdf,application/pdf"
         multiple
@@ -303,6 +339,47 @@ export default function UploadForm({ onPreview }) {
 
       <small>
         {pdfFiles.length} PDF(s) selected
+      </small>
+    </div>
+
+    <div className="form-field">
+      <label htmlFor="smart-bin-file">
+        Smart Waste-bin Workbook
+      </label>
+
+      <input
+        id="smart-bin-file"
+        type="file"
+        accept=".xlsx,.xlsm"
+        onChange={(event) =>
+          setSmartBinFile(event.target.files?.[0] ?? null)
+        }
+      />
+
+      {smartBinFile && <small>{smartBinFile.name}</small>}
+    </div>
+
+    <div className="form-field">
+      <label htmlFor="smart-bin-collection-point">
+        Smart-bin Collection Point
+      </label>
+
+      <select
+        id="smart-bin-collection-point"
+        value={smartBinCollectionPoint}
+        onChange={(event) =>
+          setSmartBinCollectionPoint(event.target.value)
+        }
+      >
+        {FOOD_WASTE_COLLECTION_POINTS.map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+
+      <small>
+        Smart-bin waste will be deducted from this PDF collection point.
       </small>
     </div>
 

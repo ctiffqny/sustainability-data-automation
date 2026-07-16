@@ -242,10 +242,12 @@ export default function PreviewTable({
             Rounding update
           </span>
 
-          <span>
-            <i className="legend-box legend-inconsistency" />
-            Inconsistency
-          </span>
+          {category !== "food_waste" && (
+            <span>
+              <i className="legend-box legend-inconsistency" />
+              Inconsistency
+            </span>
+          )}
         </div>
       </div>
 

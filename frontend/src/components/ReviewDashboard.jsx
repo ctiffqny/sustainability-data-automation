@@ -64,6 +64,8 @@ export default function ReviewDashboard({ previewResult }) {
     preview.category ??
     "Unknown";
 
+  const isFoodWaste = category === "food_waste";
+
   /*
    * Use a backend-provided reviewed-row count when available.
    * Otherwise, fall back to the number of updated rows.
@@ -127,15 +129,17 @@ export default function ReviewDashboard({ previewResult }) {
             </span>
           </div>
 
-          <div className="summary-item">
-            <span className="summary-label">
-              Inconsistencies
-            </span>
+          {!isFoodWaste && (
+            <div className="summary-item">
+              <span className="summary-label">
+                Inconsistencies
+              </span>
 
-            <span className="summary-value">
-              {inconsistencies.length}
-            </span>
-          </div>
+              <span className="summary-value">
+                {inconsistencies.length}
+              </span>
+            </div>
+          )}
 
           <div className="summary-item">
             <span className="summary-label">
@@ -191,9 +195,11 @@ export default function ReviewDashboard({ previewResult }) {
         previewResult={previewResult}
       />
 
-      <InconsistencyTable
-        inconsistencies={inconsistencies}
-      />
+      {!isFoodWaste && (
+        <InconsistencyTable
+          inconsistencies={inconsistencies}
+        />
+      )}
     </section>
   );
 }

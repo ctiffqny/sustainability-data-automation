@@ -56,6 +56,8 @@ def build_preview_response(
     source_file=None,
     target_file=None,
     source_files=None,
+    smart_bin_file=None,
+    smart_bin_collection_point=None,
     month=None,
 ):
     category = category.lower().strip()
@@ -97,17 +99,14 @@ def build_preview_response(
             str(path)
             for path in source_paths
         ]
+        config["month"] = month
 
-        if not month or not month.strip():
-            return {
-                "status": "error",
-                "message": (
-                    "A food-waste reporting month is required "
-                    "(for example Apr-26)."
-                ),
-            }
-
-        config["month"] = month.strip()
+        if smart_bin_file is not None:
+            smart_bin_path = save_upload(smart_bin_file)
+            config["smart_bin_source_file"] = str(smart_bin_path)
+            config["smart_bin_collection_point"] = smart_bin_collection_point
+        else:
+            smart_bin_path = None
 
         print("Starting food-waste preview")
 
@@ -118,9 +117,8 @@ def build_preview_response(
             str(path)
             for path in source_paths
         ]
-        # Explicitly preserve the processor-normalized month for the
-        # frontend Apply request.
-        result["month"] = result.get("month", config["month"])
+        result["smart_bin_path"] = str(smart_bin_path) if smart_bin_path else None
+        result["smart_bin_collection_point"] = smart_bin_collection_point
 
     else:
         source_path = save_upload(source_file)
@@ -173,6 +171,8 @@ def build_apply_response(
     target_path,
     source_path=None,
     source_paths=None,
+    smart_bin_path=None,
+    smart_bin_collection_point=None,
     month=None,
 ):
     category = category.lower().strip()
@@ -193,6 +193,9 @@ def build_apply_response(
     if category == "food_waste":
         config["source_files"] = source_paths or []
         config["month"] = month
+        if smart_bin_path:
+            config["smart_bin_source_file"] = smart_bin_path
+            config["smart_bin_collection_point"] = smart_bin_collection_point
 
         result = apply_food_waste_transfer(
             config

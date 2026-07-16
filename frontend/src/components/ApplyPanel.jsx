@@ -50,6 +50,13 @@ export default function ApplyPanel({ previewResult }) {
           formData.append("source_paths", path);
         });
         formData.append("month", previewResult.month ?? "");
+        if (previewResult.smart_bin_path) {
+          formData.append("smart_bin_path", previewResult.smart_bin_path);
+          formData.append(
+            "smart_bin_collection_point",
+            previewResult.smart_bin_collection_point ?? ""
+          );
+        }
       } else {
         formData.append("source_path", previewResult.source_path);
       }

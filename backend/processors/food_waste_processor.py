@@ -7,6 +7,7 @@ from decimal import Decimal
 from pathlib import Path
 import shutil
 from typing import Any
+import re
 
 import openpyxl
 from openpyxl import load_workbook
@@ -228,6 +229,137 @@ def _extract_pdf_values(
     return month, dict(totals_by_header), processed_rows
 
 
+
+
+def _extract_smart_bin_values(
+    config: dict[str, Any],
+) -> tuple[dict[str, Decimal], list[dict[str, Any]], Decimal]:
+    """Extract smart-bin food waste additions and collection-route deduction."""
+    source_file = config.get("smart_bin_source_file")
+    if not source_file:
+        return {}, [], Decimal("0")
+
+    source_path = Path(source_file)
+    if not source_path.is_file():
+        raise FileNotFoundError(
+            f"Smart waste-bin workbook was not found: {source_path}"
+        )
+
+    workbook = load_workbook(source_path, data_only=True, read_only=True)
+    worksheet = workbook.active
+
+    rows_iter = worksheet.iter_rows(values_only=True)
+    header_row = None
+    header_columns: dict[str, int] = {}
+    buffered_rows: list[tuple[int, tuple[Any, ...]]] = []
+
+    for row_number, values in enumerate(rows_iter, start=1):
+        normalized_values = {
+            re.sub(r"[^a-z0-9()]+", "", str(value or "").casefold()): index
+            for index, value in enumerate(values)
+            if value not in (None, "")
+        }
+        if {"kioskname", "weight(g)"}.issubset(normalized_values):
+            header_row = row_number
+            header_columns = normalized_values
+            break
+        if row_number >= 50:
+            break
+
+    if header_row is None:
+        workbook.close()
+        raise FoodWasteTransferError(
+            "Could not find kioskName and weight(g) columns in the smart-bin workbook."
+        )
+
+    kiosk_col = header_columns["kioskname"]
+    weight_col = header_columns["weight(g)"]
+    recycle_col = header_columns.get("recycletype")
+    complete_col = header_columns.get("iscomplete")
+
+    ug_total = Decimal("0")
+    staff_total = Decimal("0")
+    route_deduction = Decimal("0")
+    rows: list[dict[str, Any]] = []
+
+    for row_number, values in enumerate(rows_iter, start=header_row + 1):
+        kiosk = str(values[kiosk_col] if kiosk_col < len(values) else "").strip()
+        if not kiosk:
+            continue
+
+        if recycle_col is not None:
+            recycle_type = str(values[recycle_col] if recycle_col < len(values) else "").strip().casefold()
+            if recycle_type and "food waste" not in recycle_type:
+                continue
+
+        if complete_col is not None:
+            complete = str(values[complete_col] if complete_col < len(values) else "").strip().casefold()
+            if complete not in {"yes", "y", "true", "1", "complete", "completed"}:
+                continue
+
+        raw_weight = values[weight_col] if weight_col < len(values) else None
+        try:
+            kilograms = Decimal(str(raw_weight)) / Decimal("1000")
+        except Exception:
+            continue
+
+        normalized_kiosk = " ".join(kiosk.casefold().split())
+        is_prqs = bool(re.search(r"\bprqs\b|\bpqrs\b", normalized_kiosk))
+        is_student = (
+            "student hall" in normalized_kiosk
+            or "jockey club global graduate tower" in normalized_kiosk
+        )
+        is_staff = bool(re.search(r"staff\s+quarter(?:s)?", normalized_kiosk))
+
+        target_header = None
+        if is_student:
+            ug_total += kilograms
+            target_header = "UG Halls + Seafront Cafeteria"
+        elif is_staff and not is_prqs:
+            staff_total += kilograms
+            target_header = "Staff Quarters (All)"
+
+        # All smart-bin food waste, including PRQS, was delivered to the
+        # selected PDF collection point and must be deducted from it.
+        route_deduction += kilograms
+
+        rows.append({
+            "source_file": str(source_path),
+            "row": row_number,
+            "kiosk_name": kiosk,
+            "target_header": target_header,
+            "weight_kg": float(kilograms),
+            "excluded_from_route_deduction": False,
+        })
+
+    workbook.close()
+
+    additions: dict[str, Decimal] = {}
+    if ug_total:
+        additions["UG Halls + Seafront Cafeteria"] = ug_total
+    if staff_total:
+        additions["Staff Quarters (All)"] = staff_total
+
+    return additions, rows, route_deduction
+
+
+def _resolve_collection_point_header(config: dict[str, Any]) -> tuple[str, str]:
+    location_key = str(config.get("smart_bin_collection_point") or "").strip()
+    if not location_key:
+        raise FoodWasteTransferError(
+            "Choose the PDF collection point that received the smart-bin food waste."
+        )
+
+    loader = PDFConfigLoader(config_path=config.get("config_path"))
+    location = loader.get_location_config(location_key)
+    target_header = location.get("target_header")
+    if not target_header:
+        raise FoodWasteTransferError(
+            f"No target_header is configured for collection point '{location_key}'."
+        )
+    return target_header, location.get("display_name", location_key)
+
+
 def _transfer_food_waste(
     config: dict[str, Any],
     *,
@@ -282,6 +414,27 @@ def _transfer_food_waste(
     month, totals_by_header, extraction_rows = (
         _extract_pdf_values(config)
     )
+
+    smart_bin_rows: list[dict[str, Any]] = []
+    smart_bin_summary: dict[str, Any] | None = None
+    if config.get("smart_bin_source_file"):
+        additions, smart_bin_rows, route_deduction = _extract_smart_bin_values(config)
+        collection_header, collection_name = _resolve_collection_point_header(config)
+
+        for header, kilograms in additions.items():
+            totals_by_header[header] = totals_by_header.get(header, Decimal("0")) + kilograms
+
+        totals_by_header[collection_header] = (
+            totals_by_header.get(collection_header, Decimal("0")) - route_deduction
+        )
+
+        smart_bin_summary = {
+            "collection_point": collection_name,
+            "collection_point_target_header": collection_header,
+            "route_deduction_kg": float(route_deduction),
+            "ug_halls_addition_kg": float(additions.get("UG Halls + Seafront Cafeteria", Decimal("0"))),
+            "staff_quarters_addition_kg": float(additions.get("Staff Quarters (All)", Decimal("0"))),
+        }
 
     header_columns = _find_header_columns(
         worksheet,
@@ -391,13 +544,18 @@ def _transfer_food_waste(
         calculation_config,
     )
 
+    # Preview keeps the full workbook because the calculation processor may
+    # need supporting sheets. The applied download contains only the food-waste
+    # worksheet requested by the user.
+    if not preview:
+        for other_sheet in list(workbook.worksheets):
+            if other_sheet.title != worksheet.title:
+                workbook.remove(other_sheet)
+        workbook.active = 0
+
     workbook.save(output_path)
 
     return {
-        # Keep the normalized reporting month in the preview response.
-        # ApplyPanel sends this value back to /apply; without it the apply
-        # request receives an empty month and PDF extraction fails.
-        "month": month,
         "updated_rows": [
             {
                 "period": month,
@@ -413,6 +571,9 @@ def _transfer_food_waste(
         ],
         "processed_rows": processed_rows,
         "extraction_rows": extraction_rows,
+        "smart_bin_rows": smart_bin_rows,
+        "smart_bin_summary": smart_bin_summary,
+        "month": month,
         "inconsistencies": [],
         "new_columns": [],
         "skipped_columns": [],

@@ -11,8 +11,8 @@ from backend.services.pdf_service import (
 
 
 router = APIRouter(
-    prefix="/food-waste-pdf",
-    tags=["Food Waste PDF"],
+    prefix="/food-waste",
+    tags=["Food Waste"],
 )
 
 

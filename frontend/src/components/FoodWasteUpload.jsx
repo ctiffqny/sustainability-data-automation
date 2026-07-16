@@ -44,7 +44,7 @@ export default function FoodWasteUpload({ onResult }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <h2>Food Waste PDFs</h2>
+      <h2>Food Waste</h2>
 
       <input
         value={month}
