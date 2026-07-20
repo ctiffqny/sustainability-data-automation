@@ -125,13 +125,6 @@ def build_preview_response(
 
         config["source_file"] = str(source_path)
 
-        config["source_output_file"] = str(
-            OUTPUT_DIR
-            / (
-                f"{run_id}_{category}"
-                "_source_highlighted.xlsx"
-            )
-        )
 
         if category == "electricity":
             result = preview_electricity_transfer(
@@ -204,13 +197,6 @@ def build_apply_response(
     else:
         config["source_file"] = source_path
 
-        config["source_output_file"] = str(
-            OUTPUT_DIR
-            / (
-                f"{run_id}_{category}"
-                "_source_highlighted.xlsx"
-            )
-        )
 
         if category == "electricity":
             result = apply_electricity_transfer(

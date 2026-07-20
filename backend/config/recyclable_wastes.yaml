@@ -1,11 +1,5 @@
 category: recyclable_wastes
 
-source_file: ref/testing_recyclable_wastes_statistics_may2026.xlsx
-target_file: ref/testing_sustainability_data_report.xlsx
-
-source_output_file: testing_recyclable_wastes_statistics_may2026_highlighted.xlsx
-target_output_file: testing_recyclable_sustainability_data_report_updated.xlsx
-
 source_sheet: MAY-26
 target_sheet: Raw Data (KG)
 

@@ -11,17 +11,11 @@ import re
 
 import openpyxl
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
 
 from backend.core.pdf_config_utils import PDFConfigLoader
 from backend.processors.pdf_processor import PDFProcessor
 from backend.processors.calculation_processor import data_processing
 
-
-PREVIEW_FILL = PatternFill(
-    fill_type="solid",
-    fgColor="FFF2CC",
-)
 
 
 class FoodWasteTransferError(Exception):
@@ -525,8 +519,6 @@ def _transfer_food_waste(
         new_value = float(kilograms)
         cell.value = new_value
 
-        if preview:
-            cell.fill = PREVIEW_FILL
 
         updated_values[str(target_header)] = {
             "cell": cell.coordinate,
@@ -565,6 +557,12 @@ def _transfer_food_waste(
         workbook,
         calculation_config,
     )
+
+    # Food-waste downloads must contain only the raw food-data sheet.
+    # Run calculations first, then remove every unrelated worksheet.
+    for existing_sheet in list(workbook.sheetnames):
+        if existing_sheet != worksheet.title:
+            workbook.remove(workbook[existing_sheet])
 
     workbook.save(output_path)
 

@@ -226,7 +226,6 @@ def build_messages(
 
     if saved:
         messages.append(f"Success. Saved as {config['target_output_file']}")
-        messages.append(f"Highlighted source copy saved as {config['source_output_file']}")
     else:
         messages.append("Preview generated. No files were saved yet.")
 
@@ -525,7 +524,6 @@ def run_electricity_transfer(config, save_outputs=False):
 
     if save_outputs:
         target_wb.save(config["target_output_file"])
-        source_wb_highlight.save(config["source_output_file"])
 
     messages = build_messages(
         config=config,

@@ -111,8 +111,6 @@ export default function ApplyPanel({ previewResult }) {
     return `${API_BASE_URL}/download?${query.toString()}`;
   }
 
-  const supportsHighlightedSource =
-  previewResult?.category === "electricity";
 
   return (
     <section className="apply-panel">
@@ -160,25 +158,6 @@ export default function ApplyPanel({ previewResult }) {
               </a>
             )}
 
-            {supportsHighlightedSource ? (
-                <a
-                    className="download-button"
-                    href={createDownloadUrl(
-                    applyResult.highlighted_source_file
-                    )}
-                >
-                    Download highlighted source
-                </a>
-                ) : (
-                <button
-                    type="button"
-                    className="download-button"
-                    disabled
-                    title="Not available for Recyclable Wastes."
-                >
-                    Download highlighted source
-                </button>
-                )}
           </div>
 
           <button

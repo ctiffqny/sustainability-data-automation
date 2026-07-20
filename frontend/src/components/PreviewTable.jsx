@@ -174,6 +174,10 @@ export default function PreviewTable({
   }
 
   function getCellClass(row, column, cell) {
+    if (category === "food_waste") {
+      return "";
+    }
+
     if (isInconsistency(cell)) {
         return "cell-inconsistency";
     }
@@ -231,24 +235,24 @@ export default function PreviewTable({
           </p>
         </div>
 
-        <div className="preview-legend">
-          <span>
-            <i className="legend-box legend-new-row" />
-            New or placeholder row
-          </span>
+        {category !== "food_waste" && (
+          <div className="preview-legend">
+            <span>
+              <i className="legend-box legend-new-row" />
+              New or placeholder row
+            </span>
 
-          <span>
-            <i className="legend-box legend-rounding" />
-            Rounding update
-          </span>
+            <span>
+              <i className="legend-box legend-rounding" />
+              Rounding update
+            </span>
 
-          {category !== "food_waste" && (
             <span>
               <i className="legend-box legend-inconsistency" />
               Inconsistency
             </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="excel-preview-scroll">
@@ -267,7 +271,11 @@ export default function PreviewTable({
             {rows.map((row) => (
               <tr
                 key={`${row.period}-${row.target_row}`}
-                className={row.is_new_row ? "new-row" : ""}
+                className={
+                  category !== "food_waste" && row.is_new_row
+                    ? "new-row"
+                    : ""
+                }
               >
                 <td title={getRowLabel(row)}>
                   {formatPeriod(row.period)}
